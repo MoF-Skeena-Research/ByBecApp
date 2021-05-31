@@ -131,6 +131,82 @@ leafletjs_feas <-  tags$head(
   ))
 )
 
+jscode_fh <- paste0('window.LeafletWidget.methods.addFHTiles = function(BGC,Colour,Lab) {
+      var subzoneColors = {};
+      var tooltipLabs = {};
+      BGC.forEach((bec,i) => {
+        const col = Colour[i];
+        const label = Lab[i];
+        subzoneColors[bec] = col;
+        tooltipLabs[bec] = label;
+      });
+      
+      var map = this;
+      
+      var vectorTileOptions=function(layerName, layerId, activ,
+                                     lfPane, colorMap, prop, id) {
+        return {
+          vectorTileLayerName: layerName,
+          interactive: true, 
+          vectorTileLayerStyles: {
+            [layerId]: function(properties, zoom) {
+              return {
+                weight: 0,
+                fillColor: colorMap[properties[prop]],
+                fill: true,
+                fillOpacity: 1
+              }
+            }
+          },
+          pane : lfPane,
+          getFeatureId: function(f) {
+            return f.properties[id];
+          }
+        }
+        
+      };
+      
+      var subzLayer = L.vectorGrid.protobuf(
+        "', bcgov_tileserver, '",
+        vectorTileOptions("bec_fh", "', bcgov_tilelayer, '", true,
+                          "tilePane", subzoneColors, "MAP_LABEL", "MAP_LABEL")
+      )
+      console.log(subzLayer);
+      this.layerManager.addLayer(subzLayer, "tile", "bec_fh", "Feasibility")
+		  
+      subzLayer.bindTooltip(function(e) {
+        return tooltipLabs[e.properties.MAP_LABEL]
+      }, {sticky: true, textsize: "10px", opacity: 1});
+      subzLayer.bringToFront();
+      
+          var styleFH = {
+            weight: 0,
+            fillColor: "#d80000",
+            fillOpacity: 1,
+            fill: true
+          };
+      var prevPest = ["SBSdk","IDFdk3"];
+      //update style for pests
+      Shiny.addCustomMessageHandler("colourPest",function(pestBGC){
+        console.log(pestBGC);
+        prevPest.forEach((hl,i) => {
+          subzLayer.resetFeatureStyle(hl);
+        });
+        prevPest = pestBGC;
+        pestBGC.forEach((ID,i) => {
+          subzLayer.setFeatureStyle(ID, styleFH);
+        });
+
+      });
+      
+    };')
+
+leafletjs_fh <-  tags$head(
+  tags$script(HTML(
+    jscode_fh
+  ))
+)
+
 addBGCTiles <- function(map) {
   map <- registerPlugin(map, plugins$vgplugin)
   map <- registerPlugin(map, plugins$sliderplugin)

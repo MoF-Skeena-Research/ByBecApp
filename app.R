@@ -201,6 +201,23 @@ ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
                                  textInput("assessMod",label = "Enter your initials:"),
                                  actionButton("submitAss","Submit Assessment")
                                  )
+                          ),
+                 tabPanel("Forest Health",
+                          column(3,
+                                 pickerInput("fhSpp",
+                                             label = "Select Host Species",
+                                             choices = sppList,
+                                             selected = "Cw"),
+                                 selectInput("pestSpp",
+                                             label = "Select Pest",
+                                             choices = NULL,
+                                             multiple = F)
+                                 ),
+                          column(9,
+                                 h3("Pest by Host map"),
+                                 leafletjs_fh,
+                                 leafletOutput("fhMap", height = "700px")
+                                 )
                           )
                           
                  )
@@ -363,6 +380,80 @@ server <- function(input, output, session) {
                                 removeGlPoints("tree_trial")
                         }
                     })
+    ###end offsite tab##
+    
+    ### start for health tab ###
+    observeEvent(input$fhSpp,{
+        treeSpp <- substr(input$fhSpp,1,2)
+        dat <- dbGetQuery(con,paste0("select distinct pest from forhealth where treespp like '",treeSpp,"%'"))
+        if(nrow(dat) == 0){
+            updateSelectInput(session, "pestSpp", choices = "")
+        }else{
+            updateSelectInput(session, "pestSpp", choices = dat[,1])
+        }
+    })
+    
+    observeEvent(input$pestSpp,{
+        dat <- dbGetQuery(con,paste0("select bgc,hazard from forhealth where treespp like '",
+                                     substr(input$fhSpp,1,2),"%' and pest = '",input$pestSpp,"'"))
+        print(dat$bgc)
+        session$sendCustomMessage("colourPest",dat$bgc)
+    })
+    
+    output$fhMap <- renderLeaflet({
+        leaflet() %>%
+            setView(lng = -122.77222, lat = 51.2665, zoom = 6) %>%
+            addProviderTiles(leaflet::providers$CartoDB.PositronNoLabels, group = "Positron",
+                             options = leaflet::pathOptions(pane = "mapPane")) %>%
+            leaflet::addProviderTiles(leaflet::providers$Esri.WorldImagery, group = "Satellite",
+                                      options = leaflet::pathOptions(pane = "mapPane")) %>%
+            leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap",
+                                      options = leaflet::pathOptions(pane = "mapPane")) %>%
+            addBGCTiles() %>%
+            leaflet::addLayersControl(
+                baseGroups = c("Positron","Satellite", "OpenStreetMap"),
+                overlayGroups = c("BGCs"),
+                position = "topright")
+    })
+    
+    ##Prepare BGC colour table for non-edatopic
+    prepDatFH <- reactive({
+        QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,feasible from feasorig where spp = '",
+                      substr(input$fhSpp,1,2),"' and feasible in (1,2,3,4,5)")
+        d1 <- dbGetQuery(con, QRY)
+        if(nrow(d1) == 0){
+            shinyalert(title = "Oops!",text = "There are no data for that species",
+                       type = "error",showConfirmButton = T)
+            QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,feasible from feasorig where spp = 'Sx'")
+            d1 <- dbGetQuery(con, QRY)
+        }
+        feas <- as.data.table(d1)
+        feasMax <- feas[,.(SuitMax = min(feasible)), by = .(bgc,spp)]
+        feasMax[,Col := "#443e3dFF"]
+        feasMax[,Lab := bgc]
+        feasMax[,.(bgc,Col,Lab)]
+    })
+    
+    observeEvent({c(
+        input$fhSpp)
+    },{
+        dat <- prepDatFH()
+        if(nrow(dat) == 0){
+            dat <- NULL
+        }
+        print("Rendering map")
+        dat <- dat[subzTransparent, on = "bgc"]
+        dat[is.na(Col),Col := Transparent]
+        dat[is.na(Lab),Lab := bgc]
+        if(!is.null(dat)){
+            leafletProxy("fhMap") %>%
+                invokeMethod(data = dat, method = "addFHTiles", dat$bgc, dat$Col,dat$Lab)
+        }
+        
+    })
+    
+    
+    ##end for health tab###
     
     observeEvent({c(input$showtrees,
                     input$sppPick,
