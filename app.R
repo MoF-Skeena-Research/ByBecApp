@@ -182,7 +182,7 @@ ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
                           ),
                  tabPanel("Off-site Trials",
                           column(3,
-                                 h3("Show Trials on Map"),
+                                 h2("Offsite Species Trials"),
                                  checkboxGroupInput("trials2","Show location of offsite trials",c("AMAT","RESULTS")),
                                  dateRangeInput("trialStart2","Filter offsite trials by planting date:",
                                                 start = minStart, end = maxStart, format = "yyyy", startview = "year"),
@@ -206,6 +206,7 @@ ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
                           ),
                  tabPanel("Forest Health",
                           column(3,
+                                 h2("Hazard Rating by Tree and Pest"),
                                  selectInput("fhSpp",
                                              label = "Select Host Species",
                                              choices = sppList),
@@ -218,7 +219,11 @@ ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
                                  h3("Pest by Host map"),
                                  leafletjs_fh,
                                  leafletOutput("fhMap", height = "700px"),
-                                 rHandsontableOutput("fh_hot")
+                                 br(),
+                                 h3("Pest Table"),
+                                 rHandsontableOutput("fh_hot"),
+                                 textInput("fhMod",label = "Enter your initials:"),
+                                 actionButton("submitFH","Submit Hazard Updates")
                                  )
                           )
                           
@@ -387,11 +392,14 @@ server <- function(input, output, session) {
     ### start for health tab ###
     observeEvent(input$fhSpp,{
         treeSpp <- substr(input$fhSpp,1,2)
-        dat <- dbGetQuery(con,paste0("select distinct pest from forhealth where treespp like '",treeSpp,"%'"))
+        dat <- dbGetQuery(con,paste0("select distinct pest,pest_name from forhealth where treespp like '",treeSpp,"%'"))
+        dat$pest_name <- paste0(dat$pest," - ", dat$pest_name)
         if(nrow(dat) == 0){
             updateSelectInput(session, "pestSpp", choices = "")
         }else{
-            updateSelectInput(session, "pestSpp", choices = dat[,1])
+            temp <- dat$pest
+            names(temp) <- dat$pest_name
+            updateSelectInput(session, "pestSpp", choices = temp)
         }
     })
     
@@ -408,10 +416,14 @@ server <- function(input, output, session) {
             leaflet::addLayersControl(
                 baseGroups = c("Positron","Satellite", "OpenStreetMap"),
                 overlayGroups = c("BGCs"),
-                position = "topright")
+                position = "topright") %>%
+            addLegend(position = "bottomright",
+                       labels = c("Unspecified","Low","Moderate","High","Outside Range"),
+                       colors = c("#443e3d","#0CC200","#FFEF01","#D80000","#840090"),
+                       title = "Hazard",
+                       layerId = "bec_fh")
     })
     
-    ##Prepare BGC colour table for non-edatopic
     prepDatFH <- reactive({
         QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,feasible from feasorig where spp = '",
                       substr(input$fhSpp,1,2),"' and feasible in (1,2,3,4,5)")
@@ -430,9 +442,10 @@ server <- function(input, output, session) {
     })
     
     observeEvent(input$pestSpp,{
-        dat <- dbGetQuery(con,paste0("select bgc,hazard from forhealth where treespp like '",
+        dat <- dbGetQuery(con,paste0("select bgc,hazard_update from forhealth where treespp like '",
                                      substr(input$fhSpp,1,2),"%' and pest = '",input$pestSpp,"'"))
         dat <- as.data.table(dat)
+        setnames(dat, old = "hazard_update", new = "hazard")
         dat[fhCols,fhcol := i.Col, on = "hazard"]
         rangeDat <- prepDatFH()
         dat[rangeDat, InRange := i.Col, on = "bgc"]
@@ -465,19 +478,52 @@ server <- function(input, output, session) {
             if(nrow(test) == 0){
                 NULL
             }else{
-                dat1 <- dbGetQuery(con,paste0("select tree_name, pest, pest_name, bgc, hazard 
+                dat1 <- dbGetQuery(con,paste0("select treespp, pest, pest_name, bgc, hazard, hazard_update 
                                           from forhealth where treespp like '",
                                               substr(input$fhSpp,1,2),"%' and bgc = '",input$fh_click,"'"))
                 otherPest <- as.data.table(dbGetQuery(con,paste0("select distinct pest,pest_name from forhealth where treespp like '",substr(input$fhSpp,1,2),"%'")))
                 otherPest <- otherPest[!pest %chin% dat1$pest,]
-                dat2 <- data.table(tree_name = substr(input$fhSpp,1,2),pest = otherPest$pest,
-                                   pest_name = otherPest$pest_name, bgc = input$fh_click, hazard = "UN")
+                if(nrow(otherPest) == 0){
+                    dat2 <- NULL
+                }else{
+                    dat2 <- data.table(treespp = input$fhSpp,pest = otherPest$pest,
+                                       pest_name = otherPest$pest_name, bgc = input$fh_click, hazard = "UN",hazard_update = NA)
+                }
                 dat <- rbind(dat1,dat2)
+                dat$treespp <- substr(dat$treespp, 1,2)
                 output$fh_hot <- renderRHandsontable({
-                    rhandsontable(dat)
+                    rhandsontable(dat) %>%
+                        hot_col("hazard",readOnly = T) %>%
+                        hot_col("hazard_update", type = "autocomplete",source = c("Low","Moderate","High","UN"))
                 })
             }
         }
+    })
+    
+    observeEvent(input$submitFH,{
+        dat <- as.data.table(hot_to_r(input$fh_hot))
+        dat[,mod := input$fhMod]
+        d1 <- dat[hazard == "UN",]
+        d2 <- dat[hazard != "UN",]
+        if(nrow(d1) > 0){
+            d3 <- data.table(treespp = d1$treespp, tree_name = NA,
+                             pest = d1$pest, pest_name = d1$pest_name, 
+                             bgc = d1$bgc, hazard = "UN", 
+                             hazard_update = d1$hazard_update, mod = input$fhMod)
+            dbWriteTable(con,"forhealth",d3,append = T, row.names = F)
+            
+        }
+        if(nrow(d2) > 0){
+            dbWriteTable(con, "temp_fh", d2, overwrite = T,row.names = F)
+            dbExecute(con,"UPDATE forhealth
+                  SET hazard_update = temp_fh.hazard_update,
+                  mod = temp_fh.mod
+                  FROM temp_fh
+                  WHERE forhealth.treespp = temp_fh.treespp
+                  AND forhealth.pest = temp_fh.pest
+                  AND forhealth.bgc = temp_fh.bgc")
+        }
+        shinyalert("Thank you!","Your updates have been recorded", type = "info", inputId = "fhMessage")
     })
     
     
