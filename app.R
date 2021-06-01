@@ -40,6 +40,8 @@ edaMaxCol <- "#440154FF"
 edaMinCol <- "#FDE725FF"
 assCols <- data.frame(assessment = c("Fail","Poor","Fair","Good","Excellent","UN"), 
                         Col = c("#E20000","#FF7B00","#FFEC00","#91FB00","#1DB000","#FF00B4"))
+fhCols <- data.frame(hazard = c("High","Moderate","Low"), 
+                     Col = c("#D80000","#FFEF01","#0CC200"))
 
 #grRamp <- colorRamp(c(edaMaxCol,edaMinCol),alpha = T) ##colour ramp for gray values
 grRamp2 <- colorRamp(c("#443e3dFF","#c0c0c0ff"),alpha = T) ##colour ramp for gray values
@@ -204,19 +206,19 @@ ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
                           ),
                  tabPanel("Forest Health",
                           column(3,
-                                 pickerInput("fhSpp",
+                                 selectInput("fhSpp",
                                              label = "Select Host Species",
-                                             choices = sppList,
-                                             selected = "Cw"),
+                                             choices = sppList),
                                  selectInput("pestSpp",
                                              label = "Select Pest",
-                                             choices = NULL,
+                                             choices = c("DRN","DRL","IDW"),
                                              multiple = F)
                                  ),
                           column(9,
                                  h3("Pest by Host map"),
                                  leafletjs_fh,
-                                 leafletOutput("fhMap", height = "700px")
+                                 leafletOutput("fhMap", height = "700px"),
+                                 rHandsontableOutput("fh_hot")
                                  )
                           )
                           
@@ -393,13 +395,6 @@ server <- function(input, output, session) {
         }
     })
     
-    observeEvent(input$pestSpp,{
-        dat <- dbGetQuery(con,paste0("select bgc,hazard from forhealth where treespp like '",
-                                     substr(input$fhSpp,1,2),"%' and pest = '",input$pestSpp,"'"))
-        print(dat$bgc)
-        session$sendCustomMessage("colourPest",dat$bgc)
-    })
-    
     output$fhMap <- renderLeaflet({
         leaflet() %>%
             setView(lng = -122.77222, lat = 51.2665, zoom = 6) %>%
@@ -434,6 +429,17 @@ server <- function(input, output, session) {
         feasMax[,.(bgc,Col,Lab)]
     })
     
+    observeEvent(input$pestSpp,{
+        dat <- dbGetQuery(con,paste0("select bgc,hazard from forhealth where treespp like '",
+                                     substr(input$fhSpp,1,2),"%' and pest = '",input$pestSpp,"'"))
+        dat <- as.data.table(dat)
+        dat[fhCols,fhcol := i.Col, on = "hazard"]
+        rangeDat <- prepDatFH()
+        dat[rangeDat, InRange := i.Col, on = "bgc"]
+        dat[is.na(InRange), fhcol := "#840090"]
+        session$sendCustomMessage("colourPest",dat[,.(bgc,fhcol)])
+    })
+    
     observeEvent({c(
         input$fhSpp)
     },{
@@ -450,6 +456,28 @@ server <- function(input, output, session) {
                 invokeMethod(data = dat, method = "addFHTiles", dat$bgc, dat$Col,dat$Lab)
         }
         
+    },priority = 10)
+    
+    observeEvent(input$fh_click,{
+        if(!is.null(input$fh_click)){
+            test <- dbGetQuery(con, paste0("select distinct spp from feasorig where bgc = '",
+                                           input$fh_click,"' and spp = '",substr(input$fhSpp,1,2),"'"))
+            if(nrow(test) == 0){
+                NULL
+            }else{
+                dat1 <- dbGetQuery(con,paste0("select tree_name, pest, pest_name, bgc, hazard 
+                                          from forhealth where treespp like '",
+                                              substr(input$fhSpp,1,2),"%' and bgc = '",input$fh_click,"'"))
+                otherPest <- as.data.table(dbGetQuery(con,paste0("select distinct pest,pest_name from forhealth where treespp like '",substr(input$fhSpp,1,2),"%'")))
+                otherPest <- otherPest[!pest %chin% dat1$pest,]
+                dat2 <- data.table(tree_name = substr(input$fhSpp,1,2),pest = otherPest$pest,
+                                   pest_name = otherPest$pest_name, bgc = input$fh_click, hazard = "UN")
+                dat <- rbind(dat1,dat2)
+                output$fh_hot <- renderRHandsontable({
+                    rhandsontable(dat)
+                })
+            }
+        }
     })
     
     

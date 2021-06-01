@@ -173,27 +173,33 @@ jscode_fh <- paste0('window.LeafletWidget.methods.addFHTiles = function(BGC,Colo
       )
       console.log(subzLayer);
       this.layerManager.addLayer(subzLayer, "tile", "bec_fh", "Feasibility")
-		  
+
+      subzLayer.on("click", function(e){
+        Shiny.setInputValue("fh_click",e.layer.properties.MAP_LABEL);
+      });
+
       subzLayer.bindTooltip(function(e) {
         return tooltipLabs[e.properties.MAP_LABEL]
       }, {sticky: true, textsize: "10px", opacity: 1});
       subzLayer.bringToFront();
       
-          var styleFH = {
-            weight: 0,
-            fillColor: "#d80000",
-            fillOpacity: 1,
-            fill: true
-          };
       var prevPest = ["SBSdk","IDFdk3"];
       //update style for pests
-      Shiny.addCustomMessageHandler("colourPest",function(pestBGC){
-        console.log(pestBGC);
+      Shiny.addCustomMessageHandler("colourPest",function(fhDat){
+        var pestBGC = fhDat["bgc"];
+        var fhCols = fhDat["fhcol"];
+        console.log(fhDat);
         prevPest.forEach((hl,i) => {
           subzLayer.resetFeatureStyle(hl);
         });
         prevPest = pestBGC;
         pestBGC.forEach((ID,i) => {
+          let styleFH = {
+            weight: 0,
+            fillColor: fhCols[i],
+            fillOpacity: 1,
+            fill: true
+          };
           subzLayer.setFeatureStyle(ID, styleFH);
         });
 
