@@ -132,25 +132,23 @@ ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
                                   column(3,
                                          h3("Tree Range and Feasibility by BGC"),
                                          actionButton("showinstr","Click To Show Instructions"),
-                                         panel(style = "overflow-y:scroll; max-height: 800px; position:relative; align: centre",
-                                               h3("Select A Tree Species"),
+                                         br(),
+                                         panel(style = "overflow-y:scroll; max-height: 900px; position:relative; align: centre",
                                                pickerInput("sppPick",
-                                                           label = "",
+                                                           label = "Select a Species",
                                                            choices = sppList,
                                                            selected = "Fd"),                                         
-                                               h3("Map Display"),
+                                               h4("Map Display"),
                                                checkboxInput("updatedfeas","Show Updated Range and Feasibility",value = F, width = "250px"),
                                                awesomeRadio("type",
                                                             label = "Range",
                                                             choices = c("Range","Climatic Suitability"),
-                                                            selected =  "Range"),
-                                               h4("or Edatopic Feasibility: \n"),
-                                               girafeOutput("edaplot"),
-                                               
-                                               
-                                               h3("Show Tree Species Locations"),
-                                               checkboxGroupInput("showtrees",NULL,choices = c("BC","AB","US"),inline = F),
-                                               checkboxGroupInput("trials","Show location of offsite trials",c("AMAT","RESULTS")),
+                                                            selected =  "Range", inline = T),
+                                               h4("Edatopic Feasibility:"),
+                                               girafeOutput("edaplot",height = "350px"),
+                                              
+                                               checkboxGroupInput("showtrees","Show species plots",choices = c("BC","AB","US"),inline = T),
+                                               checkboxGroupInput("trials","Show location of offsite trials",c("AMAT","RESULTS"), inline = T),
                                                dateRangeInput("trialStart","Filter offsite trials by planting date:",
                                                               start = minStart, end = maxStart, format = "yyyy", startview = "year")
                                          )
@@ -159,9 +157,9 @@ ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
                                   column(9,
                                          useShinyjs(),
                                          leafletjs_feas,
-                                         selectInput("selectBGC","Find a BGC", 
-                                                     choices = c("None",sort(subzones_colours_ref$BGC)), multiple = F,selected = "None"),
-                                         leafglOutput("map", height = "700px"),
+                                         
+                                         #tags$style(type = "text/css", "#map {height: calc(100vh - 250) !important;}"),
+                                         leafglOutput("map",height = "70vh"),
                                          br(),
                                          h3("Tree Feasibility Ratings for selected BGC:"),
                                          p("Edit the feasibility values here. When you click submit, 
@@ -193,7 +191,8 @@ ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
                                  actionButton("submitTrial","Submit Trial")
                                  ),
                           column(9,
-                                 leafglOutput("offsiteMap", height = "700px"),
+                                 #tags$style(type = "text/css", "#offsiteMap {height: calc(100vh - 250) !important;}"),
+                                 leafglOutput("offsiteMap", height = "70vh"),
                                  h3("Trial Info"),
                                  selectInput("trialSelect",
                                              label = "Select a trial, or click on map",
@@ -218,12 +217,24 @@ ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
                           column(9,
                                  h3("Pest by Host map"),
                                  leafletjs_fh,
-                                 leafletOutput("fhMap", height = "700px"),
+                                 #tags$style(type = "text/css", "#fhMap {height: calc(100vh - 250) !important;}"),
+                                 leafletOutput("fhMap", height = "70vh"),
                                  br(),
                                  h3("Pest Table"),
                                  rHandsontableOutput("fh_hot"),
                                  textInput("fhMod",label = "Enter your initials:"),
                                  actionButton("submitFH","Submit Hazard Updates")
+                                 )
+                          ),
+                 tabPanel("Find a BGC",
+                          column(2,
+                                 selectInput("selectBGC","Select BGC", 
+                                             choices = c("None",sort(subzones_colours_ref$BGC)), 
+                                             multiple = F,selected = "None")
+                                 ),
+                          column(12,
+                                 span(textOutput("selectedBEC", inline = T),style= "font-size:24px"),
+                                 leafletOutput("findBGCMap", height = "80vh")
                                  )
                           )
                           
@@ -292,6 +303,34 @@ server <- function(input, output, session) {
                 baseGroups = c("Positron","Satellite", "OpenStreetMap"),
                 overlayGroups = c("BGCs","Feasibility"),
                 position = "topright")
+    })
+    
+    ## find a BGC ##
+    output$findBGCMap <- renderLeaflet({
+        leaflet() %>%
+            setView(lng = -122.77222, lat = 51.2665, zoom = 6) %>%
+            addProviderTiles(leaflet::providers$CartoDB.PositronNoLabels, group = "Positron",
+                             options = leaflet::pathOptions(pane = "mapPane")) %>%
+            leaflet::addProviderTiles(leaflet::providers$Esri.WorldImagery, group = "Satellite",
+                                      options = leaflet::pathOptions(pane = "mapPane")) %>%
+            leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap",
+                                      options = leaflet::pathOptions(pane = "mapPane")) %>%
+            addSelectBEC() %>%
+            leaflet::addLayersControl(
+                baseGroups = c("Positron","Satellite", "OpenStreetMap"),
+                overlayGroups = c("BEC"),
+                position = "topright")
+    })
+    
+    observeEvent(input$selectBGC,{
+        session$sendCustomMessage("highlightBEC",input$selectBGC)
+    })
+    
+    observeEvent(input$becselect_click,{
+        output$selectedBEC <- renderText({
+           c("Selected BGC: ",
+            input$becselect_click)
+        })
     })
     
     ##offsite trials####
@@ -739,15 +778,6 @@ server <- function(input, output, session) {
     }
 
 }, priority = 15)
-    
-    observeEvent(input$selectBGC,{
-        if(input$selectBGC == "None"){
-            globalSelBEC(NULL)
-        }else{
-            globalSelBEC(input$selectBGC)
-        }
-        session$sendCustomMessage("highlightBEC",input$selectBGC)
-    })
 
     output$tableBGC <- renderUI({
         unit <- globalSelBEC()
@@ -947,7 +977,7 @@ server <- function(input, output, session) {
                                   fill = "grey", col = "purple")+
             geom_hline(aes(yintercept = grd1y), linetype = "dashed")+
             geom_vline(aes(xintercept = grd1x), linetype = "dashed")+
-            theme_bw(base_size = 10)+
+            theme_bw(base_size = 16)+
             theme(panel.grid.major = element_blank())+
             labs(x = "SNR", y = "SMR")+
             coord_fixed()

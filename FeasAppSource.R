@@ -275,3 +275,120 @@ addBGCTiles <- function(map) {
   ))
   map
 }
+
+##for find BGC tab
+addSelectBEC <- function(map) {
+  map <- registerPlugin(map, plugins$vgplugin)
+  map <- registerPlugin(map, plugins$sliderplugin)
+  map <- htmlwidgets::onRender(map, paste0('
+    function(el, x, data) {
+      ', paste0("var subzoneColors = {", paste0("'", subzones_colours_ref$BGC, "':'", subzones_colours_ref$Col,"'", collapse = ","), "}"), '
+      
+      L.bec_layer_opacity = 0.8
+      
+      var vectorTileOptions=function(layerName, layerId, activ,
+                             lfPane, colorMap, prop, id) {
+        return {
+          vectorTileLayerName: layerName,
+          interactive: activ, // makes it able to trigger js events like click
+          vectorTileLayerStyles: {
+            [layerId]: function(properties, zoom) {
+              return {
+                weight: 0,
+                fillColor: colorMap[properties[prop]],
+                fill: true,
+                fillOpacity: L.bec_layer_opacity
+              }
+            }
+          },
+          pane : lfPane,
+          getFeatureId: function(f) {
+              return f.properties[id];
+          }
+        }
+        
+      };
+      
+      var subzLayer = L.vectorGrid.protobuf(
+        "', bcgov_tileserver, '",
+        vectorTileOptions("bec_select", "', bcgov_tilelayer, '", true,
+                          "tilePane", subzoneColors, "MAP_LABEL", "MAP_LABEL")
+      )
+      this.layerManager.addLayer(subzLayer, "tile", "bec_select", "BEC");
+      
+      //highlight on click
+      var selectHighlight = "SBSdk";
+      subzLayer.on("click", function(e){
+        console.log("click");
+        subzLayer.resetFeatureStyle(selectHighlight);
+        Shiny.setInputValue("becselect_click",e.layer.properties.MAP_LABEL);
+        var properties = e.layer.properties
+  			  highlight = properties.MAP_LABEL
+  			  var style = {
+            weight: 1,
+            color: "#fc036f",
+            fillColor: subzoneColors[properties.MAP_LABEL],
+            fillOpacity: 1,
+            fill: true
+          }
+          subzLayer.setFeatureStyle(properties.MAP_LABEL, style);
+      });
+
+      var highlight;
+		  var clearHighlight = function() {
+		  	if (highlight) {
+		  		subzLayer.resetFeatureStyle(highlight);
+		  	}
+		  	highlight = null;
+		  }
+		  
+      subzLayer.on("mouseout", function(e) {
+        clearHighlight();
+      })
+      
+      var styleHL = {
+            weight: 1.5,
+            color: "#fc036f",
+            fillColor: "#FFFB00",
+            fillOpacity: 1,
+            fill: true
+          };
+
+      Shiny.addCustomMessageHandler("highlightBEC",function(BECSelect){
+        if(selectHighlight){
+          subzLayer.resetFeatureStyle(selectHighlight);
+          selectHighlight = BECSelect;
+          subzLayer.setFeatureStyle(BECSelect, styleHL);
+          Shiny.setInputValue("becselect_click",BECSelect);
+        }
+        
+      });
+      
+      //bec layer tooltip
+      subzLayer.bindTooltip(function(e) {
+        return tooltipLabs[e.properties.MAP_LABEL]
+      }, {sticky: true, textsize: "10px", opacity: 1});
+      
+      updateOpacity = function(value) {
+        L.bec_layer_opacity = parseFloat(value);
+      }
+      
+      var opacityslider2 = L.control.slider(updateOpacity, {
+        id:"opacity_slider",
+        orientation:"horizontal",
+        position:"bottomleft",
+        logo:\'<img src="www/opacity.svg" />\',
+        max:1,
+        step:0.01,
+        syncSlider:true,
+        size:"250px",
+        // Starting opacity value for bec map layers
+        value:0.8,
+        showValue:true
+      })
+      opacityslider2.addTo(this);
+    }'
+  ))
+  map
+}
+
