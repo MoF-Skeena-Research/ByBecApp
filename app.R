@@ -19,6 +19,7 @@ source("FeasAppSource.R")
 ##connect to database
 ###Read in climate summary data
 
+
 drv <- dbDriver("PostgreSQL")
 sapply(dbListConnections(drv), dbDisconnect)
 con <- dbConnect(drv, user = "postgres", password = "Kiriliny41", host = "68.183.199.104", 
@@ -150,8 +151,8 @@ ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
                                               
                                                checkboxGroupInput("showtrees","Show species plots",choices = c("BC","AB","US"),inline = T),
                                                checkboxGroupInput("trials","Show location of offsite trials",c("AMAT","RESULTS"), inline = T),
-                                               dateRangeInput("trialStart","Filter offsite trials by planting date:",
-                                                              start = minStart, end = maxStart, format = "yyyy", startview = "year")
+                                               sliderInput("trialStart","Filter offsite trials by planting date:",
+                                                           min = minStart, max = maxStart, value = c(minStart,maxStart))
                                          )
 
                                   ),
@@ -183,8 +184,14 @@ ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
                           column(3,
                                  h2("Offsite Species Trials"),
                                  checkboxGroupInput("trials2","Show location of offsite trials",c("AMAT","RESULTS")),
-                                 dateRangeInput("trialStart2","Filter offsite trials by planting date:",
-                                                start = minStart, end = maxStart, format = "yyyy", startview = "year"),
+                                 h3("Filters"),
+                                 pickerInput("sppPick2",
+                                             label = "Select a Species",
+                                             choices = c("All",sppList),
+                                             selected = "All"),
+                                 checkboxInput("multiSppTrial","Only show multi-species trials"),
+                                 sliderInput("trialStart2","Filter offsite trials by planting date:",
+                                                min = minStart, max = maxStart, value = c(minStart,maxStart)),
                                  br(),
                                  h3("Add Offsite-Trial"),
                                  rHandsontableOutput("addTrial"),
@@ -414,10 +421,32 @@ server <- function(input, output, session) {
     })
     
     observeEvent({c(input$trials2,
-                    input$trialStart2)},{
+                    input$trialStart2,
+                    input$sppPick2,
+                    input$multiSppTrial)},{
                         if(!is.null(input$trials2)){
-                            dat2 <- st_read(con,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
-                                                               "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],"'"))
+                            if(input$multiSppTrial){
+                                if(input$sppPick2 == "All"){
+                                    dat2 <- st_read(con,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
+                                                                       "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],
+                                                                       "' and plotid in (select plotid from offsite group by plotid having count(distinct spp) > 1)"))
+                                }else{
+                                    dat2 <- st_read(con,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
+                                                                       "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],"' and spp = '", substr(input$sppPick2,1,2),
+                                                                       "' and plotid in (select plotid from offsite group by plotid having count(distinct spp) > 1)"))
+                                }
+                            }else{
+                                if(input$sppPick2 == "All"){
+                                    dat2 <- st_read(con,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
+                                                                       "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],
+                                                                       "'"))
+                                }else{
+                                    dat2 <- st_read(con,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
+                                                                       "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],"' and spp = '", substr(input$sppPick2,1,2),
+                                                                       "'"))
+                                }
+                            }
+
                             if(nrow(dat2) == 0){
                                 dat2 <- NULL
                             }else{
@@ -490,7 +519,7 @@ server <- function(input, output, session) {
         feasMax[,.(bgc,Col,Lab)]
     })
     
-    observeEvent(input$pestSpp,{
+    observeEvent({c(input$pestSpp,input$submitFH,input$submitFHLong)},{
         dat <- dbGetQuery(con,paste0("select bgc,hazard_update from forhealth where treecode like '",
                                      substr(input$fhSpp,1,2),"' and pest = '",input$pestSpp,
                                      "' and hazard_update <> 'UN'"))
@@ -546,7 +575,7 @@ server <- function(input, output, session) {
                 output$fh_hot <- renderRHandsontable({
                     rhandsontable(dat,col_highlight = col_num, 
                                   row_highlight = row_num) %>%
-                        hot_cols(type = "autocomplete",source = c("Low","Moderate","High","UN"),
+                        hot_cols(type = "dropdown",source = c("Nil","Low","Moderate","High","UN"),
                                  renderer = 
                                      "function(instance, td, row, col, prop, value, cellProperties) {
                                           Handsontable.renderers.TextRenderer.apply(this, arguments);
@@ -579,7 +608,7 @@ server <- function(input, output, session) {
         if(nrow(dat) > 0){
             output$fh_hot_long <- renderRHandsontable({
                 rhandsontable(dat) %>%
-                    hot_col("hazard_update",type = "autocomplete",source = c("Low","Moderate","High","UN"),strict = T)
+                    hot_col("hazard_update",type = "dropdown",source = c("Nil","Low","Moderate","High","UN"),strict = T)
             })
         }
     
