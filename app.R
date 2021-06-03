@@ -18,6 +18,7 @@ library(colourvalues)
 source("FeasAppSource.R")
 ##connect to database
 ###Read in climate summary data
+
 drv <- dbDriver("PostgreSQL")
 sapply(dbListConnections(drv), dbDisconnect)
 con <- dbConnect(drv, user = "postgres", password = "Kiriliny41", host = "68.183.199.104", 
@@ -212,7 +213,11 @@ ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
                                  selectInput("pestSpp",
                                              label = "Select Pest",
                                              choices = c("DRN","DRL","IDW"),
-                                             multiple = F)
+                                             multiple = F),
+                                 h3("Hazard By BGC"),
+                                 rHandsontableOutput("fh_hot_long"),
+                                 textInput("fhModLong",label = "Enter your initials:"),
+                                 actionButton("submitFHLong","Submit Hazard Updates")
                                  ),
                           column(9,
                                  h3("Pest by Host map"),
@@ -220,7 +225,7 @@ ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
                                  #tags$style(type = "text/css", "#fhMap {height: calc(100vh - 250) !important;}"),
                                  leafletOutput("fhMap", height = "70vh"),
                                  br(),
-                                 h3("Pest Table"),
+                                 span(textOutput("pestDatLabel", inline = T),style= "font-size:22px"),
                                  rHandsontableOutput("fh_hot"),
                                  textInput("fhMod",label = "Enter your initials:"),
                                  actionButton("submitFH","Submit Hazard Updates")
@@ -298,9 +303,14 @@ server <- function(input, output, session) {
                                       options = leaflet::pathOptions(pane = "mapPane")) %>%
             leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap",
                                       options = leaflet::pathOptions(pane = "mapPane")) %>%
+            leaflet::addTiles(
+                urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
+                attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
+                group = "Hillshade",
+                options = leaflet::pathOptions(pane = "mapPane")) %>%
             addBGCTiles() %>%
             leaflet::addLayersControl(
-                baseGroups = c("Positron","Satellite", "OpenStreetMap"),
+                baseGroups = c("Positron","Satellite", "OpenStreetMap","Hillshade"),
                 overlayGroups = c("BGCs","Feasibility"),
                 position = "topright")
     })
@@ -431,7 +441,7 @@ server <- function(input, output, session) {
     ### start for health tab ###
     observeEvent(input$fhSpp,{
         treeSpp <- substr(input$fhSpp,1,2)
-        dat <- dbGetQuery(con,paste0("select distinct pest,pest_name from forhealth where treespp like '",treeSpp,"%'"))
+        dat <- dbGetQuery(con,paste0("select distinct pest,pest_name from forhealth where treecode like '",treeSpp,"'"))
         dat$pest_name <- paste0(dat$pest," - ", dat$pest_name)
         if(nrow(dat) == 0){
             updateSelectInput(session, "pestSpp", choices = "")
@@ -481,9 +491,11 @@ server <- function(input, output, session) {
     })
     
     observeEvent(input$pestSpp,{
-        dat <- dbGetQuery(con,paste0("select bgc,hazard_update from forhealth where treespp like '",
-                                     substr(input$fhSpp,1,2),"%' and pest = '",input$pestSpp,"'"))
+        dat <- dbGetQuery(con,paste0("select bgc,hazard_update from forhealth where treecode like '",
+                                     substr(input$fhSpp,1,2),"' and pest = '",input$pestSpp,
+                                     "' and hazard_update <> 'UN'"))
         dat <- as.data.table(dat)
+        #browser()
         setnames(dat, old = "hazard_update", new = "hazard")
         dat[fhCols,fhcol := i.Col, on = "hazard"]
         rangeDat <- prepDatFH()
@@ -511,54 +523,97 @@ server <- function(input, output, session) {
     },priority = 10)
     
     observeEvent(input$fh_click,{
-        if(!is.null(input$fh_click)){
-            test <- dbGetQuery(con, paste0("select distinct spp from feasorig where bgc = '",
-                                           input$fh_click,"' and spp = '",substr(input$fhSpp,1,2),"'"))
-            if(nrow(test) == 0){
-                NULL
-            }else{
-                dat1 <- dbGetQuery(con,paste0("select treespp, pest, pest_name, bgc, hazard, hazard_update 
-                                          from forhealth where treespp like '",
-                                              substr(input$fhSpp,1,2),"%' and bgc = '",input$fh_click,"'"))
-                otherPest <- as.data.table(dbGetQuery(con,paste0("select distinct pest,pest_name from forhealth where treespp like '",substr(input$fhSpp,1,2),"%'")))
-                otherPest <- otherPest[!pest %chin% dat1$pest,]
-                if(nrow(otherPest) == 0){
-                    dat2 <- NULL
-                }else{
-                    dat2 <- data.table(treespp = input$fhSpp,pest = otherPest$pest,
-                                       pest_name = otherPest$pest_name, bgc = input$fh_click, hazard = "UN",hazard_update = NA)
-                }
-                dat <- rbind(dat1,dat2)
-                dat$treespp <- substr(dat$treespp, 1,2)
-                output$fh_hot <- renderRHandsontable({
-                    rhandsontable(dat) %>%
-                        hot_col("hazard",readOnly = T) %>%
-                        hot_col("hazard_update", type = "autocomplete",source = c("Low","Moderate","High","UN"))
-                })
-            }
-        }
+        output$pestDatLabel <- renderText({
+            paste0("Pest Table for ",input$fh_click)
+        })
     })
     
+    observeEvent(input$fh_click,{
+        if(!is.null(input$fh_click)){
+                dat1 <- dbGetQuery(con,paste0("select treecode, pest, pest_name, bgc, hazard, hazard_update 
+                                          from forhealth where bgc = '",input$fh_click,"'"))
+                dat <- as.data.table(dat1)
+                if(nrow(dat) < 1){
+                    dat <- data.table()
+                    col_num <- NULL
+                    row_num <- NULL
+                }else{
+                    dat <- dcast(dat, treecode ~ pest, value.var = "hazard_update", 
+                                 fun.aggregate = function(x) x[1])
+                    col_num <- which(colnames(dat) == input$pestSpp) - 1
+                    row_num <- which(dat$treecode == substr(input$fhSpp,1,2)) - 1
+                }
+                output$fh_hot <- renderRHandsontable({
+                    rhandsontable(dat,col_highlight = col_num, 
+                                  row_highlight = row_num) %>%
+                        hot_cols(type = "autocomplete",source = c("Low","Moderate","High","UN"),
+                                 renderer = 
+                                     "function(instance, td, row, col, prop, value, cellProperties) {
+                                          Handsontable.renderers.TextRenderer.apply(this, arguments);
+                                          
+                                          if(instance.params) {
+                                            hcols = instance.params.col_highlight
+                                            hcols = hcols instanceof Array ? hcols : [hcols]
+                                            hrows = instance.params.row_highlight
+                                            hrows = hrows instanceof Array ? hrows : [hrows]
+                                          }
+                                        if (instance.params && (col === hcols[0])) {
+                                          td.style.background = 'pink';
+                                        }
+                                        if (instance.params && (row === hrows[0])) {
+                                          td.style.background = 'lightgreen';
+                                        }
+                                        if (instance.params && (col === hcols[0] && row === hrows[0])) {
+                                          td.style.background = 'yellow';
+                                        }
+                                      }"
+                                     )
+                })
+            }
+    })
+    
+    observeEvent({c(input$pestSpp,
+                    input$fhSpp)},{
+        dat <- dbGetQuery(con,paste0("select distinct bgc, hazard, hazard_update from forhealth where treecode = '",
+                          substr(input$fhSpp,1,2),"' and pest = '",input$pestSpp,"'"))
+        if(nrow(dat) > 0){
+            output$fh_hot_long <- renderRHandsontable({
+                rhandsontable(dat) %>%
+                    hot_col("hazard_update",type = "autocomplete",source = c("Low","Moderate","High","UN"),strict = T)
+            })
+        }
+    
+    })
+
     observeEvent(input$submitFH,{
         dat <- as.data.table(hot_to_r(input$fh_hot))
+        dat <- melt(dat,id.vars = "treecode",variable.name = "pest",value.name = "hazard_update")
         dat[,mod := input$fhMod]
-        d1 <- dat[hazard == "UN",]
-        d2 <- dat[hazard != "UN",]
-        if(nrow(d1) > 0){
-            d3 <- data.table(treespp = d1$treespp, tree_name = NA,
-                             pest = d1$pest, pest_name = d1$pest_name, 
-                             bgc = d1$bgc, hazard = "UN", 
-                             hazard_update = d1$hazard_update, mod = input$fhMod)
-            dbWriteTable(con,"forhealth",d3,append = T, row.names = F)
-            
-        }
-        if(nrow(d2) > 0){
-            dbWriteTable(con, "temp_fh", d2, overwrite = T,row.names = F)
+        dat[,bgc := input$fh_click]
+        if(nrow(dat) > 0){
+            dbWriteTable(con, "temp_fh", dat, overwrite = T,row.names = F)
             dbExecute(con,"UPDATE forhealth
                   SET hazard_update = temp_fh.hazard_update,
                   mod = temp_fh.mod
                   FROM temp_fh
-                  WHERE forhealth.treespp = temp_fh.treespp
+                  WHERE forhealth.treecode = temp_fh.treecode
+                  AND forhealth.pest = temp_fh.pest
+                  AND forhealth.bgc = temp_fh.bgc")
+        }
+        shinyalert("Thank you!","Your updates have been recorded", type = "info", inputId = "fhMessage")
+    })
+    
+    observeEvent(input$submitFHLong,{
+        dat <- as.data.table(hot_to_r(input$fh_hot_long))
+        dat[,`:=`(mod = input$fhModLong,treecode = substr(input$fhSpp,1,2),
+                  pest = input$pestSpp)]
+        if(nrow(dat) > 0){
+            dbWriteTable(con, "temp_fh", dat, overwrite = T,row.names = F)
+            dbExecute(con,"UPDATE forhealth
+                  SET hazard_update = temp_fh.hazard_update,
+                  mod = temp_fh.mod
+                  FROM temp_fh
+                  WHERE forhealth.treecode = temp_fh.treecode
                   AND forhealth.pest = temp_fh.pest
                   AND forhealth.bgc = temp_fh.bgc")
         }
@@ -636,7 +691,6 @@ server <- function(input, output, session) {
         feasMax <- feas[,.(SuitMax = min(feasible)), by = .(bgc,sppsplit)]
         if(input$type == "Range"){
             if(length(unique(feasMax$sppsplit)) > 1){
-                browser()
                 feasMax[,SppNum := as.numeric(as.factor(sppsplit))]
                 tempCol <- grRamp2(rescale(feasMax$SppNum,to = c(0,0.6)))
                 feasMax[,Col := rgb(tempCol[,1],tempCol[,2],tempCol[,3],tempCol[,4], maxColorValue = 255)]
