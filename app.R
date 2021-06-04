@@ -216,7 +216,7 @@ ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
                                  h2("Hazard Rating by Tree and Pest"),
                                  selectInput("fhSpp",
                                              label = "Select Host Species",
-                                             choices = sppList),
+                                             choices = c("None",sppList)),
                                  selectInput("pestSpp",
                                              label = "Select Pest",
                                              choices = c("DRN","DRL","IDW"),
@@ -471,10 +471,10 @@ server <- function(input, output, session) {
     observeEvent(input$fhSpp,{
         treeSpp <- substr(input$fhSpp,1,2)
         dat <- dbGetQuery(con,paste0("select distinct pest,pest_name from forhealth where treecode like '",treeSpp,"'"))
-        dat$pest_name <- paste0(dat$pest," - ", dat$pest_name)
         if(nrow(dat) == 0){
             updateSelectInput(session, "pestSpp", choices = "")
         }else{
+            dat$pest_name <- paste0(dat$pest," - ", dat$pest_name)
             temp <- dat$pest
             names(temp) <- dat$pest_name
             updateSelectInput(session, "pestSpp", choices = temp)
@@ -506,17 +506,16 @@ server <- function(input, output, session) {
         QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,feasible from feasorig where spp = '",
                       substr(input$fhSpp,1,2),"' and feasible in (1,2,3,4,5)")
         d1 <- dbGetQuery(con, QRY)
-        if(nrow(d1) == 0){
-            shinyalert(title = "Oops!",text = "There are no data for that species",
-                       type = "error",showConfirmButton = T)
-            QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,feasible from feasorig where spp = 'Sx'")
-            d1 <- dbGetQuery(con, QRY)
+        if(nrow(d1) != 0){
+            feas <- as.data.table(d1)
+            feasMax <- feas[,.(SuitMax = min(feasible)), by = .(bgc,spp)]
+            feasMax[,Col := "#443e3dFF"]
+            feasMax[,Lab := bgc]
+            feasMax[,.(bgc,Col,Lab)]
+        }else{
+            data.table()
         }
-        feas <- as.data.table(d1)
-        feasMax <- feas[,.(SuitMax = min(feasible)), by = .(bgc,spp)]
-        feasMax[,Col := "#443e3dFF"]
-        feasMax[,Lab := bgc]
-        feasMax[,.(bgc,Col,Lab)]
+        
     })
     
     observeEvent({c(input$pestSpp,input$submitFH,input$submitFHLong)},{
@@ -525,12 +524,15 @@ server <- function(input, output, session) {
                                      "' and hazard_update <> 'UN'"))
         dat <- as.data.table(dat)
         #browser()
-        setnames(dat, old = "hazard_update", new = "hazard")
-        dat[fhCols,fhcol := i.Col, on = "hazard"]
-        rangeDat <- prepDatFH()
-        dat[rangeDat, InRange := i.Col, on = "bgc"]
-        dat[is.na(InRange), fhcol := "#840090"]
-        session$sendCustomMessage("colourPest",dat[,.(bgc,fhcol)])
+        if(nrow(dat) > 0){
+            setnames(dat, old = "hazard_update", new = "hazard")
+            dat[fhCols,fhcol := i.Col, on = "hazard"]
+            rangeDat <- prepDatFH()
+            dat[rangeDat, InRange := i.Col, on = "bgc"]
+            dat[is.na(InRange), fhcol := "#840090"]
+            session$sendCustomMessage("colourPest",dat[,.(bgc,fhcol)])
+        }
+        
     })
     
     observeEvent({c(
@@ -539,15 +541,17 @@ server <- function(input, output, session) {
         dat <- prepDatFH()
         if(nrow(dat) == 0){
             dat <- NULL
+        }else{
+            print("Rendering map")
+            dat <- dat[subzTransparent, on = "bgc"]
+            dat[is.na(Col),Col := Transparent]
+            dat[is.na(Lab),Lab := bgc]
+            if(!is.null(dat)){
+                leafletProxy("fhMap") %>%
+                    invokeMethod(data = dat, method = "addFHTiles", dat$bgc, dat$Col,dat$Lab)
+            }
         }
-        print("Rendering map")
-        dat <- dat[subzTransparent, on = "bgc"]
-        dat[is.na(Col),Col := Transparent]
-        dat[is.na(Lab),Lab := bgc]
-        if(!is.null(dat)){
-            leafletProxy("fhMap") %>%
-                invokeMethod(data = dat, method = "addFHTiles", dat$bgc, dat$Col,dat$Lab)
-        }
+        
         
     },priority = 10)
     
