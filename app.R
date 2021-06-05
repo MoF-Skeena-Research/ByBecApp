@@ -19,7 +19,6 @@ source("FeasAppSource.R")
 ##connect to database
 ###Read in climate summary data
 
-
 drv <- dbDriver("PostgreSQL")
 sapply(dbListConnections(drv), dbDisconnect)
 con <- dbConnect(drv, user = "postgres", password = "Kiriliny41", host = "68.183.199.104", 
@@ -40,8 +39,10 @@ idDat[,ID := c(5,5,10,15,15,4,4,9,14,14,4,4,9,14,14,3,3,8,13,13,3,3,8,13,13,2,2,
 idDat[,edatopic := paste0(SNR,SMR)]
 edaMaxCol <- "#440154FF"
 edaMinCol <- "#FDE725FF"
-assCols <- data.frame(assessment = c("Fail","Poor","Fair","Good","Excellent","UN"), 
-                        Col = c("#E20000","#FF7B00","#FFEC00","#91FB00","#1DB000","#FF00B4"))
+assCols <- data.table(ID = c(1,2,3,4,5,0), 
+                        Col = c("#E20000","#FF7B00","#FFEC00","#91FB00","#1DB000","#6B6B6B"))
+assID <- data.table(assessment = c("Fail","Poor","Fair","Good","Excellent","UN"),
+                    ID = c(1,2,3,4,5,0))
 fhCols <- data.frame(hazard = c("High","Moderate","Low"), 
                      Col = c("#D80000","#FFEF01","#0CC200"))
 
@@ -49,14 +50,10 @@ fhCols <- data.frame(hazard = c("High","Moderate","Low"),
 grRamp2 <- colorRamp(c("#443e3dFF","#c0c0c0ff"),alpha = T) ##colour ramp for gray values
 
 ##initial input table for adding offsite trial
-trialInit <- data.table(plotid = character(1),
+trialInit <- data.table(
                   spp = character(1),
                   numplanted = numeric(1),
                   seedlot = character(1),
-                  planted = as.Date("2021-01-01"),
-                  project_id = character(1),
-                  lat = numeric(1),
-                  long = numeric(1),
                   assessment = character(1))
 
 ##setup species picker
@@ -77,8 +74,11 @@ minStart <- dbGetQuery(con,"select min(planted) from offsite")[1,1]
 maxStart <- dbGetQuery(con,"select max(planted) from offsite")[1,1]
 
 offsiteNames <- dbGetQuery(con,"select distinct plotid from offsite")[,1]
+offsiteProj <- dbGetQuery(con,"select distinct project_id from offsite")[,1]
 ##max suitability colours
 ##BGC colours
+zones <- sort(unique(gsub("[[:lower:]]|[[:digit:]]","", subzones_colours_ref$BGC)))
+subzones <- unique(subzones_colours_ref$BGC)
 
 subzTransparent <- copy(subzones_colours_ref)
 subzTransparent[,Col := "#FFFFFF00"]
@@ -133,7 +133,6 @@ ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
                           fluidPage(
                                   column(3,
                                          h3("Tree Range and Feasibility by BGC"),
-                                         actionButton("showinstr","Click To Show Instructions"),
                                          br(),
                                          panel(style = "overflow-y:scroll; max-height: 900px; position:relative; align: centre",
                                                pickerInput("sppPick",
@@ -153,7 +152,10 @@ ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
                                                checkboxGroupInput("trials","Show location of offsite trials",c("AMAT","RESULTS"), inline = T),
                                                sliderInput("trialStart","Filter offsite trials by planting date:",
                                                            min = minStart, max = maxStart, value = c(minStart,maxStart))
-                                         )
+                                         ),
+                                         p("Site Author: Kiri Daust"),
+                                         p("Content Author: Will MacKenzie"),
+                                         p("Please submit issues or PRs to our", a("Github repo",href = "https://github.com/FLNRO-Smithers-Research/ByBecApp"))
 
                                   ),
                                   column(9,
@@ -161,6 +163,8 @@ ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
                                          leafletjs_feas,
                                          
                                          #tags$style(type = "text/css", "#map {height: calc(100vh - 250) !important;}"),
+                                         actionButton("showinstr","Click To Show Instructions"),
+                                         br(),
                                          leafglOutput("map",height = "70vh"),
                                          br(),
                                          h3("Tree Feasibility Ratings for selected BGC:"),
@@ -183,7 +187,7 @@ ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
                  tabPanel("Off-site Trials",
                           column(3,
                                  h2("Offsite Species Trials"),
-                                 checkboxGroupInput("trials2","Show location of offsite trials",c("AMAT","RESULTS")),
+                                 checkboxGroupInput("trials2","Show location of offsite trials",offsiteProj),
                                  h3("Filters"),
                                  pickerInput("sppPick2",
                                              label = "Select a Species",
@@ -194,12 +198,21 @@ ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
                                                 min = minStart, max = maxStart, value = c(minStart,maxStart)),
                                  br(),
                                  h3("Add Offsite-Trial"),
+                                 splitLayout(
+                                     selectInput("addTr_proj",label = "Choose Project Name",choices = offsiteProj,multiple = F),
+                                     textInput("addTr_id",label = "Enter trial id"),
+                                     dateInput("addTr_planted",label = "Enter date planted")
+                                 ),
+                                 h4("Enter location or click on map:"),
+                                 splitLayout(
+                                     textInput("addTr_lat","Latitude"),
+                                     textInput("addTr_long","Longitude")
+                                 ),
                                  rHandsontableOutput("addTrial"),
                                  textInput("trialMod","Enter your initials:"),
                                  actionButton("submitTrial","Submit Trial")
                                  ),
                           column(9,
-                                 #tags$style(type = "text/css", "#offsiteMap {height: calc(100vh - 250) !important;}"),
                                  leafglOutput("offsiteMap", height = "70vh"),
                                  h3("Trial Info"),
                                  selectInput("trialSelect",
@@ -240,10 +253,15 @@ ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
                           ),
                  tabPanel("Find a BGC",
                           column(2,
-                                 selectInput("selectBGC","Select BGC", 
-                                             choices = c("None",sort(subzones_colours_ref$BGC)), 
-                                             multiple = F,selected = "None")
-                                 ),
+                                 selectInput("selectBGC","Select Zone", 
+                                             choices = zones, 
+                                             multiple = F,selected = ""),
+                                 pickerInput("selectSubzone","Select subzone(s)",
+                                             choices = "",multiple = T, options =  list(
+                                                 `actions-box` = TRUE,
+                                                 size = 10)
+                                 )
+                          ),
                           column(12,
                                  span(textOutput("selectedBEC", inline = T),style= "font-size:24px"),
                                  leafletOutput("findBGCMap", height = "80vh")
@@ -259,7 +277,7 @@ server <- function(input, output, session) {
     globalLeg <- reactiveValues(Legend = climaticLeg)
     globalSelBEC <- reactiveVal()
     globalAddTrial <- reactiveValues(data = trialInit)
-    
+
     observeEvent(input$showinstr,{
         shinyalert(title = "Instructions",html = T,text = instr)
     })
@@ -340,13 +358,24 @@ server <- function(input, output, session) {
     })
     
     observeEvent(input$selectBGC,{
-        session$sendCustomMessage("highlightBEC",input$selectBGC)
+        temp <- subzones[grep(input$selectBGC,subzones)]
+        updatePickerInput(session,"selectSubzone",choices = temp)
+    })
+    
+    observeEvent(input$selectSubzone,{
+        session$sendCustomMessage("highlightBEC",input$selectSubzone)
     })
     
     observeEvent(input$becselect_click,{
         output$selectedBEC <- renderText({
-           c("Selected BGC: ",
-            input$becselect_click)
+            if(length(input$becselect_click) > 1){
+                c("Selected BGC: ",
+                  input$selectBGC)
+            }else{
+                c("Selected BGC: ",
+                  input$becselect_click)
+            }
+           
         })
     })
     
@@ -374,7 +403,7 @@ server <- function(input, output, session) {
                                              input$trialSelect,"'"))
                 dat <- unique(as.data.table(dat))
                 rhandsontable(dat) %>%
-                    hot_col(col = "assessment",type = "dropdown",source = c("Fail","Poor","Fair","Good","Excellent","UN","Oink"))
+                    hot_col(col = "assessment",type = "dropdown",source = c("Fail","Poor","Fair","Good","Excellent","UN"))
             }
         })
     })
@@ -395,30 +424,36 @@ server <- function(input, output, session) {
     
     observeEvent(input$offsiteMap_glify_click,{
         val <- input$offsiteMap_glify_click$data
-        pattern <- "Name:\\s*(.*?)\\s*<br>"
-        nme <- regmatches(val,regexec(pattern,val))[[1]][2]
+        nme <- gsub("Name: ","",val)
         updateSelectInput(session,"trialSelect",selected = nme)
     })
     
     output$addTrial <- renderRHandsontable({
-        rhandsontable(globalAddTrial$data)
+        input$submitTrial
+        rhandsontable(trialInit) %>%
+            hot_col("assessment", type = "dropdown", 
+                    source = c("Fail","Poor","Fair","Good","Excellent","UN"),strict = T)
     })
     
     observeEvent(input$offsiteMap_click,{
-        dat <- as.data.table(hot_to_r(input$addTrial))
-        dat$lat <- input$offsiteMap_click$lat
-        dat$long <- input$offsiteMap_click$lng
-        globalAddTrial$data <- dat
+        lat <- input$offsiteMap_click$lat
+        long <- input$offsiteMap_click$lng
+        updateTextInput(session,"addTr_lat",value = lat)
+        updateTextInput(session, "addTr_long", value = long)
     })
     
     observeEvent(input$submitTrial,{
         dat <- as.data.table(hot_to_r(input$addTrial))
-        globalAddTrial$data <- trialInit
-        dat$mod <- input$trialMod
+        dat[,`:=`(plotid = input$addTr_id,planted = input$addTr_planted,
+                  project_id = input$addTr_proj, mod = input$trialMod,
+                  lat = input$addTr_lat,long = input$addTr_long)]
         dat <- st_as_sf(dat, coords = c("long","lat"), crs = 4326)
         st_write(dat, con, "offsite", append = TRUE)
         shinyalert("Thank you!","Your trial has been recorded", type = "info", inputId = "trialMessage")
-    })
+        updateTextInput(session,"addTr_id",value = "")
+        updateDateInput(session,"addTr_planted",value = as.Date("2000-01-01"))
+        updateTextInput(session,"addTr_id",value = "")
+    },priority = 5)
     
     observeEvent({c(input$trials2,
                     input$trialStart2,
@@ -432,8 +467,8 @@ server <- function(input, output, session) {
                                                                        "' and plotid in (select plotid from offsite group by plotid having count(distinct spp) > 1)"))
                                 }else{
                                     dat2 <- st_read(con,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
-                                                                       "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],"' and spp = '", substr(input$sppPick2,1,2),
-                                                                       "' and plotid in (select plotid from offsite group by plotid having count(distinct spp) > 1)"))
+                                                                       "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],"' and spp like '", substr(input$sppPick2,1,2),
+                                                                       "%' and plotid in (select plotid from offsite group by plotid having count(distinct spp) > 1)"))
                                 }
                             }else{
                                 if(input$sppPick2 == "All"){
@@ -442,23 +477,32 @@ server <- function(input, output, session) {
                                                                        "'"))
                                 }else{
                                     dat2 <- st_read(con,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
-                                                                       "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],"' and spp = '", substr(input$sppPick2,1,2),
-                                                                       "'"))
+                                                                       "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],"' and spp like '", substr(input$sppPick2,1,2),
+                                                                       "%'"))
                                 }
                             }
 
                             if(nrow(dat2) == 0){
                                 dat2 <- NULL
                             }else{
-                                dat2$label <- paste0("Name: ",dat2$plotid,"<br>Seedlot: ",dat2$seedlot)
-                                updateSelectInput(session,"trialSelect",choices = unique(dat2$plotid))
-                                dat2 <- dat2[,c("project_id","label","assessment")]
-                                colnames(dat2)[1] <- "region"
-                                dat2 <- merge(dat2, assCols, by = "assessment")
-                                dat2$Col <- as.character(dat2$Col)
+                                plotLocs <- unique(dat2["plotid"])
+                                dat <- as.data.table(st_drop_geometry(dat2))
+                                if(input$sppPick2 == "All"){
+                                    dat <- dat[,.(Col = if(all(assessment == "UN")) "#6B6B6B" else "#AD00BD"),
+                                               by = .(plotid)]
+                                }else{
+                                    dat[assID, ID := i.ID, on = "assessment"]
+                                    dat <- dat[,.(ID = max(ID)), by = .(plotid,spp)]
+                                    dat[assCols, Col := i.Col, on = "ID"]
+                                }
+                                dat[,label := paste0("Name: ",plotid)]
+                                dat <- dat[,.(plotid,label,Col)]
+                                dat[,Col := as.character(Col)]
+                                updateSelectInput(session,"trialSelect",choices = unique(dat$plotid))
+                                plotLocs <- merge(plotLocs, dat, by = "plotid")
                                 leafletProxy("offsiteMap") %>%
-                                    addGlPoints(data = dat2,layerId = "tree_trial",popup = ~ label,
-                                                fillColor = dat2$Col,fragmentShaderSource = "point")
+                                    addGlPoints(data = plotLocs,layerId = "tree_trial",popup = ~ label,
+                                                fillColor = ~ Col,fragmentShaderSource = "point")
                             }
                         }else{
                             leafletProxy("offsiteMap") %>%
@@ -561,8 +605,7 @@ server <- function(input, output, session) {
         })
     })
     
-    observeEvent(input$fh_click,{
-        if(!is.null(input$fh_click)){
+    observeEvent({c(input$fh_click,input$fhSpp,input$pestSpp)},{
                 dat1 <- dbGetQuery(con,paste0("select treecode, pest, pest_name, bgc, hazard, hazard_update 
                                           from forhealth where bgc = '",input$fh_click,"'"))
                 dat <- as.data.table(dat1)
@@ -602,7 +645,6 @@ server <- function(input, output, session) {
                                       }"
                                      )
                 })
-            }
     })
     
     observeEvent({c(input$pestSpp,

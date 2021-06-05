@@ -172,7 +172,8 @@ jscode_fh <- paste0('window.LeafletWidget.methods.addFHTiles = function(BGC,Colo
                           "tilePane", subzoneColors, "MAP_LABEL", "MAP_LABEL")
       )
       console.log(subzLayer);
-      this.layerManager.addLayer(subzLayer, "tile", "bec_fh", "Feasibility")
+      this.layerManager.addLayer(subzLayer, "tile", "bec_fh", "Feasibility");
+      Shiny.setInputValue("fh_click",null);
 
       subzLayer.on("click", function(e){
         Shiny.setInputValue("fh_click",e.layer.properties.MAP_LABEL);
@@ -220,7 +221,7 @@ addBGCTiles <- function(map) {
     function(el, x, data) {
       ', paste0("var subzoneColors = {", paste0("'", subzones_colours_ref$BGC, "':'", subzones_colours_ref$Col,"'", collapse = ","), "}"), '
       
-      L.bec_layer_opacity = 0.2
+      //L.bec_layer_opacity = 0.2
       
       var vectorTileOptions=function(layerName, layerId, activ,
                              lfPane, colorMap, prop, id) {
@@ -262,6 +263,7 @@ addBGCTiles <- function(map) {
         position:"bottomleft",
         logo:\'<img src="www/opacity.svg" />\',
         max:1,
+        title: "BGC Opacity",
         step:0.01,
         syncSlider:true,
         size:"250px",
@@ -284,7 +286,7 @@ addSelectBEC <- function(map) {
     function(el, x, data) {
       ', paste0("var subzoneColors = {", paste0("'", subzones_colours_ref$BGC, "':'", subzones_colours_ref$Col,"'", collapse = ","), "}"), '
       
-      L.bec_layer_opacity = 0.8
+      //L.bec_layer_opacity = 0.8
       
       var vectorTileOptions=function(layerName, layerId, activ,
                              lfPane, colorMap, prop, id) {
@@ -317,21 +319,23 @@ addSelectBEC <- function(map) {
       this.layerManager.addLayer(subzLayer, "tile", "bec_select", "BEC");
       
       //highlight on click
-      var selectHighlight = "SBSdk";
+      var styleHL = {
+            weight: 1.5,
+            color: "#fc036f",
+            fillColor: "#FFFB00",
+            fillOpacity: 1,
+            fill: true
+          };
+      var selectHighlight = ["SBSdk","SBSmc2"];
       subzLayer.on("click", function(e){
         console.log("click");
-        subzLayer.resetFeatureStyle(selectHighlight);
+        selectHighlight.forEach((ID,i) => {
+          subzLayer.resetFeatureStyle(ID);
+        });
         Shiny.setInputValue("becselect_click",e.layer.properties.MAP_LABEL);
         var properties = e.layer.properties
   			  highlight = properties.MAP_LABEL
-  			  var style = {
-            weight: 1,
-            color: "#fc036f",
-            fillColor: subzoneColors[properties.MAP_LABEL],
-            fillOpacity: 1,
-            fill: true
-          }
-          subzLayer.setFeatureStyle(properties.MAP_LABEL, style);
+          subzLayer.setFeatureStyle(properties.MAP_LABEL, styleHL);
       });
 
       var highlight;
@@ -345,20 +349,20 @@ addSelectBEC <- function(map) {
       subzLayer.on("mouseout", function(e) {
         clearHighlight();
       })
-      
-      var styleHL = {
-            weight: 1.5,
-            color: "#fc036f",
-            fillColor: "#FFFB00",
-            fillOpacity: 1,
-            fill: true
-          };
 
       Shiny.addCustomMessageHandler("highlightBEC",function(BECSelect){
+        console.log(BECSelect);
+        if(!Array.isArray(BECSelect)){
+          BECSelect = [BECSelect];
+        }
         if(selectHighlight){
-          subzLayer.resetFeatureStyle(selectHighlight);
+          selectHighlight.forEach((ID,i) => {
+            subzLayer.resetFeatureStyle(ID);
+          });
           selectHighlight = BECSelect;
-          subzLayer.setFeatureStyle(BECSelect, styleHL);
+          BECSelect.forEach((ID,i) => {
+            subzLayer.setFeatureStyle(ID, styleHL);
+          });
           Shiny.setInputValue("becselect_click",BECSelect);
         }
         
@@ -374,7 +378,7 @@ addSelectBEC <- function(map) {
       }
       
       var opacityslider2 = L.control.slider(updateOpacity, {
-        id:"opacity_slider",
+        id:"opacity_slider2",
         orientation:"horizontal",
         position:"bottomleft",
         logo:\'<img src="www/opacity.svg" />\',
@@ -382,6 +386,7 @@ addSelectBEC <- function(map) {
         step:0.01,
         syncSlider:true,
         size:"250px",
+        title: "Adjust BGC Opacity",
         // Starting opacity value for bec map layers
         value:0.8,
         showValue:true
