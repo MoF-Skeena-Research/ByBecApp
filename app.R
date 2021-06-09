@@ -15,9 +15,11 @@ library(shinyjs)
 library(leafgl)
 library(leaflet)
 library(colourvalues)
+library(shinythemes)
 source("FeasAppSource.R")
 ##connect to database
 ###Read in climate summary data
+
 
 drv <- dbDriver("PostgreSQL")
 sapply(dbListConnections(drv), dbDisconnect)
@@ -126,147 +128,166 @@ instr <- tagList(
 )
 
 # Define UI for application that draws a histogram
-ui <- navbarPage("By BEC Map",theme = "css/bcgov.css",
-                 tabPanel("Tree Feasibility",
-                          useShinyalert(),
-                          useShinyjs(),
-                          fluidPage(
-                                  column(3,
-                                         h3("Tree Range and Feasibility by BGC"),
-                                         br(),
-                                         panel(style = "overflow-y:scroll; max-height: 900px; position:relative; align: centre",
-                                               pickerInput("sppPick",
-                                                           label = "Select a Species",
-                                                           choices = sppList,
-                                                           selected = "Fd"),                                         
-                                               h4("Map Display"),
-                                               checkboxInput("updatedfeas","Show Updated Range and Feasibility",value = F, width = "250px"),
-                                               awesomeRadio("type",
-                                                            label = "Range",
-                                                            choices = c("Range","Climatic Suitability"),
-                                                            selected =  "Range", inline = T),
-                                               h4("Edatopic Feasibility:"),
-                                               girafeOutput("edaplot",height = "350px"),
+ui <- fluidPage(theme = shinytheme("lumen"),
+                fluidRow(column(6,img(src = "images/puppy1.jpg",height = "100px",align = "left"),
+                                img(src = "images/puppy2.png",height = "100px",align = "left"),
+                                img(src = "images/puppy3.jpg",height = "100px",align = "left")),column(6,h1("By BEC Map"))),
+                tabsetPanel(
+                    tabPanel("Tree Feasibility",
+                             useShinyalert(),
+                             useShinyjs(),
+                             fluidPage(
+                                 column(3,
+                                        h3("Tree Range and Feasibility by BGC"),
+                                        br(),
+                                        panel(style = "overflow-y:scroll; max-height: 900px; position:relative; align: centre",
+                                              pickerInput("sppPick",
+                                                          label = "Select a Species",
+                                                          choices = sppList,
+                                                          selected = "Fd"),                                         
+                                              h4("Map Display"),
+                                              checkboxInput("updatedfeas","Show Updated Range and Feasibility",value = F, width = "250px"),
+                                              awesomeRadio("type",
+                                                           label = "Range",
+                                                           choices = c("Range","Climatic Suitability"),
+                                                           selected =  "Range", inline = T),
+                                              h4("Edatopic Feasibility:"),
+                                              girafeOutput("edaplot",height = "350px"),
                                               
-                                               checkboxGroupInput("showtrees","Show species plots",choices = c("BC","AB","US"),inline = T),
-                                               checkboxGroupInput("trials","Show location of offsite trials",c("AMAT","RESULTS"), inline = T),
-                                               sliderInput("trialStart","Filter offsite trials by planting date:",
-                                                           min = minStart, max = maxStart, value = c(minStart,maxStart))
-                                         ),
-                                         p("Site Author: Kiri Daust"),
-                                         p("Content Author: Will MacKenzie"),
-                                         p("Please submit issues or PRs to our", a("Github repo",href = "https://github.com/FLNRO-Smithers-Research/ByBecApp"))
-
-                                  ),
-                                  column(9,
-                                         useShinyjs(),
-                                         leafletjs_feas,
-                                         
-                                         #tags$style(type = "text/css", "#map {height: calc(100vh - 250) !important;}"),
-                                         actionButton("showinstr","Click To Show Instructions"),
-                                         br(),
-                                         leafglOutput("map",height = "70vh"),
-                                         br(),
-                                         h3("Tree Feasibility Ratings for selected BGC:"),
-                                         p("Edit the feasibility values here. When you click submit, 
+                                              checkboxGroupInput("showtrees","Show species plots",choices = c("BC","AB","US"),inline = T),
+                                              checkboxGroupInput("trials","Show location of offsite trials",c("AMAT","RESULTS"), inline = T),
+                                              sliderInput("trialStart","Filter offsite trials by planting date:",
+                                                          min = minStart, max = maxStart, value = c(minStart,maxStart))
+                                        )
+                                        
+                                 ),
+                                 column(9,
+                                        useShinyjs(),
+                                        leafletjs_feas,
+                                        
+                                        #tags$style(type = "text/css", "#map {height: calc(100vh - 250) !important;}"),
+                                        actionButton("showinstr","Click To Show Instructions"),
+                                        br(),
+                                        leafglOutput("map",height = "70vh"),
+                                        br(),
+                                        h3("Tree Feasibility Ratings for selected BGC:"),
+                                        p("Edit the feasibility values here. When you click submit, 
                                             the updated values will be sent to a database. If you are looking
                                            at updated values, they will be shown with a pink background on the table."),
-                                         fluidRow(
-                                             uiOutput("tableBGC"),
-                                             rHandsontableOutput("hot"),
-                                             br(),
-                                             hidden(actionBttn("submitdat", label = "Submit Changes!")),
-                                             hidden(actionBttn("addspp","Add Species")),
-                                             h4("Download feasibility data and updates:"),
-                                             downloadButton("downloadFeas")
-                                         )
-                                  )
-                              
-                              )
-                          ),
-                 tabPanel("Off-site Trials",
-                          column(3,
-                                 h2("Offsite Species Trials"),
-                                 checkboxGroupInput("trials2","Show location of offsite trials",offsiteProj),
-                                 h3("Filters"),
-                                 pickerInput("sppPick2",
-                                             label = "Select a Species",
-                                             choices = c("All",sppList),
-                                             selected = "All"),
-                                 checkboxInput("multiSppTrial","Only show multi-species trials"),
-                                 sliderInput("trialStart2","Filter offsite trials by planting date:",
+                                        fluidRow(
+                                            uiOutput("tableBGC"),
+                                            rHandsontableOutput("hot"),
+                                            br(),
+                                            hidden(actionBttn("submitdat", label = "Submit Changes!")),
+                                            hidden(actionBttn("addspp","Add Species")),
+                                            h4("Download feasibility data and updates:"),
+                                            downloadButton("downloadFeas")
+                                        )
+                                 )
+                                 
+                             )
+                    ),
+                    tabPanel("Off-site Trials",
+                             column(3,
+                                    h2("Offsite Species Trials"),
+                                    checkboxGroupInput("trials2","Show location of offsite trials",offsiteProj),
+                                    h3("Filters"),
+                                    pickerInput("sppPick2",
+                                                label = "Select a Species",
+                                                choices = c("All",sppList),
+                                                selected = "All"),
+                                    checkboxInput("multiSppTrial","Only show multi-species trials"),
+                                    sliderInput("trialStart2","Filter offsite trials by planting date:",
                                                 min = minStart, max = maxStart, value = c(minStart,maxStart)),
-                                 br(),
-                                 h3("Add Offsite-Trial"),
-                                 splitLayout(
-                                     selectInput("addTr_proj",label = "Choose Project Name",choices = offsiteProj,multiple = F),
-                                     textInput("addTr_id",label = "Enter trial id"),
-                                     dateInput("addTr_planted",label = "Enter date planted")
-                                 ),
-                                 h4("Enter location or click on map:"),
-                                 splitLayout(
-                                     textInput("addTr_lat","Latitude"),
-                                     textInput("addTr_long","Longitude")
-                                 ),
-                                 rHandsontableOutput("addTrial"),
-                                 textInput("trialMod","Enter your initials:"),
-                                 actionButton("submitTrial","Submit Trial")
-                                 ),
-                          column(9,
-                                 leafglOutput("offsiteMap", height = "70vh"),
-                                 h3("Trial Info"),
-                                 selectInput("trialSelect",
-                                             label = "Select a trial, or click on map",
-                                             choices = NULL),
-                                 h4("Update assessment in table below:"),
-                                 rHandsontableOutput("assIn"),
-                                 textInput("assessMod",label = "Enter your initials:"),
-                                 actionButton("submitAss","Submit Assessment")
-                                 )
-                          ),
-                 tabPanel("Forest Health",
-                          column(3,
-                                 h2("Hazard Rating by Tree and Pest"),
-                                 selectInput("fhSpp",
-                                             label = "Select Host Species",
-                                             choices = c("None",sppList)),
-                                 selectInput("pestSpp",
-                                             label = "Select Pest",
-                                             choices = c("DRN","DRL","IDW"),
-                                             multiple = F),
-                                 h3("Hazard By BGC"),
-                                 rHandsontableOutput("fh_hot_long"),
-                                 textInput("fhModLong",label = "Enter your initials:"),
-                                 actionButton("submitFHLong","Submit Hazard Updates")
-                                 ),
-                          column(9,
-                                 h3("Pest by Host map"),
-                                 leafletjs_fh,
-                                 #tags$style(type = "text/css", "#fhMap {height: calc(100vh - 250) !important;}"),
-                                 leafletOutput("fhMap", height = "70vh"),
-                                 br(),
-                                 span(textOutput("pestDatLabel", inline = T),style= "font-size:22px"),
-                                 rHandsontableOutput("fh_hot"),
-                                 textInput("fhMod",label = "Enter your initials:"),
-                                 actionButton("submitFH","Submit Hazard Updates")
-                                 )
-                          ),
-                 tabPanel("Find a BGC",
-                          column(2,
-                                 selectInput("selectBGC","Select Zone", 
-                                             choices = zones, 
-                                             multiple = F,selected = ""),
-                                 pickerInput("selectSubzone","Select subzone(s)",
-                                             choices = "",multiple = T, options =  list(
-                                                 `actions-box` = TRUE,
-                                                 size = 10)
-                                 )
-                          ),
-                          column(12,
-                                 span(textOutput("selectedBEC", inline = T),style= "font-size:24px"),
-                                 leafletOutput("findBGCMap", height = "80vh")
-                                 )
-                          )
+                                    br(),
+                                    h3("Add Offsite-Trial"),
+                                    splitLayout(
+                                        selectInput("addTr_proj",label = "Choose Project Name",choices = offsiteProj,multiple = F),
+                                        textInput("addTr_id",label = "Enter trial id"),
+                                        dateInput("addTr_planted",label = "Enter date planted")
+                                    ),
+                                    h4("Enter location or click on map:"),
+                                    splitLayout(
+                                        textInput("addTr_lat","Latitude"),
+                                        textInput("addTr_long","Longitude")
+                                    ),
+                                    rHandsontableOutput("addTrial"),
+                                    textInput("trialMod","Enter your initials:"),
+                                    actionButton("submitTrial","Submit Trial")
+                             ),
+                             column(9,
+                                    leafglOutput("offsiteMap", height = "70vh"),
+                                    h3("Trial Info"),
+                                    selectInput("trialSelect",
+                                                label = "Select a trial, or click on map",
+                                                choices = NULL),
+                                    h4("Update assessment in table below:"),
+                                    rHandsontableOutput("assIn"),
+                                    textInput("assessMod",label = "Enter your initials:"),
+                                    actionButton("submitAss","Submit Assessment")
+                             )
+                    ),
+                    tabPanel("Forest Health",
+                             column(3,
+                                    h2("Hazard Rating by Tree and Pest"),
+                                    selectInput("fhSpp",
+                                                label = "Select Host Species",
+                                                choices = c("None",sppList)),
+                                    selectInput("pestSpp",
+                                                label = "Select Pest",
+                                                choices = c("DRN","DRL","IDW"),
+                                                multiple = F),
+                                    h3("Hazard By BGC"),
+                                    rHandsontableOutput("fh_hot_long"),
+                                    textInput("fhModLong",label = "Enter your initials:"),
+                                    actionButton("submitFHLong","Submit Hazard Updates")
+                             ),
+                             column(9,
+                                    h3("Pest by Host map"),
+                                    leafletjs_fh,
+                                    #tags$style(type = "text/css", "#fhMap {height: calc(100vh - 250) !important;}"),
+                                    leafletOutput("fhMap", height = "70vh"),
+                                    br(),
+                                    span(textOutput("pestDatLabel", inline = T),style= "font-size:22px"),
+                                    p("Note: to add a new pest, right-click on the table, select 'add row', and enter 
+                                   pest name, code, and hazard ratings."),
+                                    rHandsontableOutput("fh_hot"),
+                                    textInput("fhMod",label = "Enter your initials:"),
+                                    actionButton("submitFH","Submit Hazard Updates")
+                             )
+                    ),
+                    tabPanel("Find a BGC",
+                             column(2,
+                                    selectInput("selectBGC","Select Zone", 
+                                                choices = zones, 
+                                                multiple = F,selected = ""),
+                                    pickerInput("selectSubzone","Select subzone(s)",
+                                                choices = "",multiple = T, options =  list(
+                                                    `actions-box` = TRUE,
+                                                    size = 10)
+                                    )
+                             ),
+                             column(12,
+                                    span(textOutput("selectedBEC", inline = T),style= "font-size:24px"),
+                                    leafletOutput("findBGCMap", height = "80vh")
+                             )
+                    ),
+                    tabPanel("About",
+                             panel(style = "overflow-y:scroll; max-height: 900px; position:relative; align: centre",
+                                   h1("About the By BGC Map Apps"),
+                                   p("This site houses a collection of apps all centered around 
+                                     using the BEC system. Probably Will wants to put something here. BEC
+                                     is good, BEC is great, BEC might even be god. Should we explain the 
+                                     apps here or have instructions on their respective pages?", style = "font-size:18px"),
+                                   hr(),
+                                   h3("Authors"),
+                                   p("Site Author: Kiri Daust"),
+                                   p("Content Author: Will MacKenzie"),
+                                   p("Please submit issues or PRs to our", a("Github repo",href = "https://github.com/FLNRO-Smithers-Research/ByBecApp"))
+                                   )
+                             )
+                )
+                 
                           
                  )
 
@@ -336,7 +357,7 @@ server <- function(input, output, session) {
             addBGCTiles() %>%
             leaflet::addLayersControl(
                 baseGroups = c("Positron","Satellite", "OpenStreetMap","Hillshade"),
-                overlayGroups = c("BGCs","Feasibility"),
+                overlayGroups = c("BGCs","Feasibility","Districts"),
                 position = "topright")
     })
     
@@ -350,9 +371,14 @@ server <- function(input, output, session) {
                                       options = leaflet::pathOptions(pane = "mapPane")) %>%
             leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap",
                                       options = leaflet::pathOptions(pane = "mapPane")) %>%
+            leaflet::addTiles(
+                urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
+                attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
+                group = "Hillshade",
+                options = leaflet::pathOptions(pane = "mapPane")) %>%
             addSelectBEC() %>%
             leaflet::addLayersControl(
-                baseGroups = c("Positron","Satellite", "OpenStreetMap"),
+                baseGroups = c("Positron","Satellite", "OpenStreetMap","Hillshade"),
                 overlayGroups = c("BEC"),
                 position = "topright")
     })
@@ -389,10 +415,15 @@ server <- function(input, output, session) {
                                       options = leaflet::pathOptions(pane = "mapPane")) %>%
             leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap",
                                       options = leaflet::pathOptions(pane = "mapPane")) %>%
+            leaflet::addTiles(
+                urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
+                attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
+                group = "Hillshade",
+                options = leaflet::pathOptions(pane = "mapPane")) %>%
             addBGCTiles() %>%
             leaflet::addLayersControl(
-                baseGroups = c("Positron","Satellite", "OpenStreetMap"),
-                overlayGroups = c("BGCs"),
+                baseGroups = c("Positron","Satellite", "OpenStreetMap","Hillshade"),
+                overlayGroups = c("BGCs","Districts"),
                 position = "topright")
     })
     
@@ -534,10 +565,15 @@ server <- function(input, output, session) {
                                       options = leaflet::pathOptions(pane = "mapPane")) %>%
             leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap",
                                       options = leaflet::pathOptions(pane = "mapPane")) %>%
+            leaflet::addTiles(
+                urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
+                attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
+                group = "Hillshade",
+                options = leaflet::pathOptions(pane = "mapPane")) %>%
             addBGCTiles() %>%
             leaflet::addLayersControl(
-                baseGroups = c("Positron","Satellite", "OpenStreetMap"),
-                overlayGroups = c("BGCs"),
+                baseGroups = c("Positron","Satellite", "OpenStreetMap","Hillshade"),
+                overlayGroups = c("BGCs","Pests","Districts"),
                 position = "topright") %>%
             addLegend(position = "bottomright",
                        labels = c("Unspecified","Low","Moderate","High","Outside Range"),
@@ -605,7 +641,7 @@ server <- function(input, output, session) {
         })
     })
     
-    observeEvent({c(input$fh_click,input$fhSpp,input$pestSpp)},{
+    observeEvent({c(input$fh_click,input$fhSpp,input$pestSpp,input$submitFHLong)},{
                 dat1 <- dbGetQuery(con,paste0("select treecode, pest, pest_name, bgc, hazard, hazard_update 
                                           from forhealth where bgc = '",input$fh_click,"'"))
                 dat <- as.data.table(dat1)
@@ -614,10 +650,11 @@ server <- function(input, output, session) {
                     col_num <- NULL
                     row_num <- NULL
                 }else{
-                    dat <- dcast(dat, treecode ~ pest, value.var = "hazard_update", 
+                    dat <- dcast(dat, pest_name + pest ~ treecode, value.var = "hazard_update", 
                                  fun.aggregate = function(x) x[1])
-                    col_num <- which(colnames(dat) == input$pestSpp) - 1
-                    row_num <- which(dat$treecode == substr(input$fhSpp,1,2)) - 1
+                    dat[is.na(dat)] <- "NULL"
+                    col_num <- which(colnames(dat) == substr(input$fhSpp,1,2)) - 1
+                    row_num <- which(dat$pest == input$pestSpp) - 1
                 }
                 output$fh_hot <- renderRHandsontable({
                     rhandsontable(dat,col_highlight = col_num, 
@@ -625,14 +662,17 @@ server <- function(input, output, session) {
                         hot_cols(type = "dropdown",source = c("Nil","Low","Moderate","High","UN"),
                                  renderer = 
                                      "function(instance, td, row, col, prop, value, cellProperties) {
-                                          Handsontable.renderers.TextRenderer.apply(this, arguments);
-                                          
-                                          if(instance.params) {
-                                            hcols = instance.params.col_highlight
-                                            hcols = hcols instanceof Array ? hcols : [hcols]
-                                            hrows = instance.params.row_highlight
-                                            hrows = hrows instanceof Array ? hrows : [hrows]
-                                          }
+                                        Handsontable.renderers.TextRenderer.apply(this, arguments);
+                                      if(instance.params) {
+                                        hcols = instance.params.col_highlight
+                                        hcols = hcols instanceof Array ? hcols : [hcols]
+                                        hrows = instance.params.row_highlight
+                                        hrows = hrows instanceof Array ? hrows : [hrows]
+                                      }
+                                      if(value == 'NULL') { 
+                                            td.style.background = 'lightgrey'; 
+                                            td.style.color = 'lightgrey';
+                                        } 
                                         if (instance.params && (col === hcols[0])) {
                                           td.style.background = 'pink';
                                         }
@@ -662,10 +702,19 @@ server <- function(input, output, session) {
 
     observeEvent(input$submitFH,{
         dat <- as.data.table(hot_to_r(input$fh_hot))
-        dat <- melt(dat,id.vars = "treecode",variable.name = "pest",value.name = "hazard_update")
+        dat[dat == "NULL"] <- NA
+        dat <- melt(dat,id.vars = c("pest_name","pest"),variable.name = "treecode",value.name = "hazard_update")
         dat[,mod := input$fhMod]
         dat[,bgc := input$fh_click]
         if(nrow(dat) > 0){
+            currPests <- dbGetQuery(con,"select distinct pest from forhealth")[,1]
+            if(any(!dat$pest %in% currPests)){
+                d2 <- dat[!pest %chin% currPests,]
+                d2[,hazard := NA]
+                d2 <- d2[!is.na(hazard_update),]
+                dbWriteTable(con,"forhealth",d2, append = T, row.names = F)
+                dat <- dat[pest %chin% currPests,]
+            }
             dbWriteTable(con, "temp_fh", dat, overwrite = T,row.names = F)
             dbExecute(con,"UPDATE forhealth
                   SET hazard_update = temp_fh.hazard_update,
@@ -707,11 +756,13 @@ server <- function(input, output, session) {
                             QRY <- paste0("select spp,plotnum,geometry from plotdata where spp = '",sppName,"' and region in ('",
                                           paste(input$showtrees,collapse = "','"),"')")
                             dat <- st_read(con,query = QRY)
-                            dat <- dat["plotnum"]
-                            colnames(dat)[1] <- "label"
-                            leafletProxy("map") %>%
-                                addGlPoints(data = dat,layerId = "tree_plot",popup = ~ label,
-                                            fillColor = "#2DB000",fragmentShaderSource = "point")
+                            if(nrow(dat) > 0){
+                                dat <- dat["plotnum"]
+                                colnames(dat)[1] <- "label"
+                                leafletProxy("map") %>%
+                                    addGlPoints(data = dat,layerId = "tree_plot",popup = ~ label,
+                                                fillColor = "#2DB000",fragmentShaderSource = "point")
+                            }
                         }else{
                             leafletProxy("map") %>%
                                 removeGlPoints("tree_plot")
@@ -723,15 +774,18 @@ server <- function(input, output, session) {
                             if(nrow(dat2) == 0){
                                 dat2 <- NULL
                             }else{
-                                dat2$label <- paste0("Name: ",dat2$plotid,"<br>Seedlot: ",dat2$seedlot)
-                                updateSelectInput(session,"trialSelect",choices = unique(dat2$plotid))
-                                dat2 <- dat2[,c("project_id","label","assessment")]
-                                colnames(dat2)[1] <- "region"
-                                dat2 <- merge(dat2, assCols, by = "assessment")
-                                dat2$Col <- as.character(dat2$Col)
+                                dat <- as.data.table(st_drop_geometry(dat2))
+                                dat[assID, ID := i.ID, on = "assessment"]
+                                dat <- dat[,.(ID = max(ID)), by = .(plotid,spp)]
+                                dat[assCols, Col := i.Col, on = "ID"]
+                                dat[,label := paste0("Name: ",plotid)]
+                                dat <- dat[,.(plotid,label,Col)]
+                                dat[,Col := as.character(Col)]
+                                plotLocs <- merge(dat2, dat, by = "plotid")
+                                
                                 leafletProxy("map") %>%
-                                    addGlPoints(data = dat2,layerId = "tree_trial",popup = ~ label,
-                                                fillColor = dat2$Col,fragmentShaderSource = "square")
+                                    addGlPoints(data = plotLocs,layerId = "tree_trial",popup = ~ label,
+                                                fillColor = plotLocs$Col,fragmentShaderSource = "square")
                             }
                         }else{
                             leafletProxy("map") %>%
@@ -815,6 +869,9 @@ server <- function(input, output, session) {
         idSub <- idDat[ID == id,.(ID,edatopic)]
         edaSub <- eda[idSub, on = "edatopic"]
         feasSub <- feas[ss_nospace %chin% edaSub$ss_nospace,]
+        if(nrow(feasSub) == 0){
+            return(NULL)
+        }
         feasSub[,Lab := paste0(ss_nospace,": ", feasible)]
         feasSum <- feasSub[,.(FeasVal = mean(feasible), Lab = paste(Lab, collapse = "<br>")), by = bgc]
         #tempCol <- grRamp(rescale(feasSum$FeasVal,to = c(0,1)))
@@ -886,26 +943,23 @@ server <- function(input, output, session) {
     }else{
         dat <- prepEdaDat()
     }
-    if(nrow(dat) == 0){
+    if(is.null(dat)){
         dat <- NULL
-    }
-    print("Rendering map")
-    dat <- dat[subzTransparent, on = "bgc"]
-    dat[is.na(Col),Col := Transparent]
-    dat[is.na(Lab),Lab := bgc]
-    if(!is.null(dat)){
+        session$sendCustomMessage("clearLayer", "Delete")
+    }else{
+        print("Rendering map")
+        dat <- dat[subzTransparent, on = "bgc"]
+        dat[is.na(Col),Col := Transparent]
+        dat[is.na(Lab),Lab := bgc]
+        
         leafletProxy("map") %>%
             invokeMethod(data = dat, method = "addGridTiles", dat$bgc, dat$Col,dat$Lab) %>%
             addLegend(position = "bottomright",
                       labels = globalLeg$Legend$labels,
                       colors = globalLeg$Legend$colours,
                       title = globalLeg$Legend$title,
-                      layerId = "bec_feas")
-    }else{
-        leafletProxy("map") %>%
-            removeShape(layer_id = "BECMap")
+                      layerId = "bec_feas") 
     }
-
 }, priority = 15)
 
     output$tableBGC <- renderUI({

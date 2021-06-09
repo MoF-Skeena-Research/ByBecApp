@@ -46,8 +46,6 @@ body {
 
 .navbar-default .navbar-brand, .navbar-default .navbar-brand:hover {
     color: #fff;
-    color: transparent;
-    background: transparent url("../images/gov3_bc_logo.png") no-repeat center center;
 }
 
 .well {

@@ -1,8 +1,11 @@
 ## Source at start of FeasibilityApp
 ## Kiri Daust
 
-bcgov_tileserver <- "http://159.203.20.90/data/tiles/{z}/{x}/{y}.pbf"
-bcgov_tilelayer <- "WNA_MAP"
+bgc_tileserver <- "http://159.203.20.90/data/WNA_MAP/{z}/{x}/{y}.pbf"
+bgc_tilelayer <- "WNA_MAP"
+district_tileserver <- "http://159.203.20.90/data/Districts/{z}/{x}/{y}.pbf"
+district_tilelayer <- "Districts"
+
 subzones_colours_ref <- fread("./inputs/WNA_v12_HexCols.csv")
 setnames(subzones_colours_ref,c("BGC","Col"))
 
@@ -58,18 +61,17 @@ jscode_feas <- paste0('window.LeafletWidget.methods.addGridTiles = function(BGC,
             return f.properties[id];
           }
         }
-        
       };
       
       var subzLayer = L.vectorGrid.protobuf(
-        "', bcgov_tileserver, '",
-        vectorTileOptions("bec_feas", "', bcgov_tilelayer, '", true,
+        "', bgc_tileserver, '",
+        vectorTileOptions("bec_feas", "', bgc_tilelayer, '", true,
                           "tilePane", subzoneColors, "MAP_LABEL", "MAP_LABEL")
       )
-      console.log(subzLayer);
+      //console.log(subzLayer);
       this.layerManager.addLayer(subzLayer, "tile", "bec_feas", "Feasibility")
-      var selectHighlight = "SBSdk";
       
+      var selectHighlight = "SBSdk";
       subzLayer.on("click", function(e){
         console.log(e.layer);
         subzLayer.resetFeatureStyle(selectHighlight);
@@ -113,14 +115,28 @@ jscode_feas <- paste0('window.LeafletWidget.methods.addGridTiles = function(BGC,
           };
           
       
-      Shiny.addCustomMessageHandler("highlightBEC",function(BECSelect){
-        console.log(BECSelect);
-        if(selectHighlight){
-          subzLayer.resetFeatureStyle(selectHighlight);
-          selectHighlight = BECSelect;
-          subzLayer.setFeatureStyle(BECSelect, styleHL);
-        }
-        
+      //Shiny.addCustomMessageHandler("highlight",function(BECSelect){
+      //  if(selectHighlight){
+      //    subzLayer.resetFeatureStyle(selectHighlight);
+      //    selectHighlight = BECSelect;
+      //    subzLayer.setFeatureStyle(BECSelect, styleHL);
+      //  }
+      //});
+      
+      //make layer transparent if no data
+      let styleCLR = {
+            weight: 0,
+            fillColor: "#9d32a8",
+            fillOpacity: 0,
+            fill: true
+          };
+      
+      Shiny.addCustomMessageHandler("clearLayer",function(x){
+        console.log(x);
+        BGC.forEach((ID,i) => {
+          subzLayer.setFeatureStyle(ID, styleCLR);
+        });
+
       });
       
     };')
@@ -167,12 +183,12 @@ jscode_fh <- paste0('window.LeafletWidget.methods.addFHTiles = function(BGC,Colo
       };
       
       var subzLayer = L.vectorGrid.protobuf(
-        "', bcgov_tileserver, '",
-        vectorTileOptions("bec_fh", "', bcgov_tilelayer, '", true,
+        "', bgc_tileserver, '",
+        vectorTileOptions("bec_fh", "', bgc_tilelayer, '", true,
                           "tilePane", subzoneColors, "MAP_LABEL", "MAP_LABEL")
       )
       console.log(subzLayer);
-      this.layerManager.addLayer(subzLayer, "tile", "bec_fh", "Feasibility");
+      this.layerManager.addLayer(subzLayer, "tile", "bec_fh", "Pests");
       Shiny.setInputValue("fh_click",null);
 
       subzLayer.on("click", function(e){
@@ -247,11 +263,41 @@ addBGCTiles <- function(map) {
       };
       
       var subzLayer = L.vectorGrid.protobuf(
-        "', bcgov_tileserver, '",
-        vectorTileOptions("bec_map", "', bcgov_tilelayer, '", false,
+        "', bgc_tileserver, '",
+        vectorTileOptions("bec_map", "', bgc_tilelayer, '", false,
                           "tilePane", subzoneColors, "MAP_LABEL", "MAP_LABEL")
       )
       this.layerManager.addLayer(subzLayer, "tile", "bec_map", "BGCs");
+      
+      //Now districts regions
+      var vectorTileOptionsDist=function(layerName, layerId, activ,
+                                     lfPane, prop, id) {
+        return {
+          vectorTileLayerName: layerName,
+          interactive: true, // makes it able to trigger js events like click
+          vectorTileLayerStyles: {
+            [layerId]: function(properties, zoom) {
+              return {
+                weight: 0.5,
+                color: "#000000",
+                fill: false,
+                fillOpacity: 0
+              }
+            }
+          },
+          pane : lfPane,
+          getFeatureId: function(f) {
+            return f.properties[id];
+          }
+        }
+      };
+      var distLayer = L.vectorGrid.protobuf(
+        "', district_tileserver, '",
+        vectorTileOptionsDist("Districts", "', district_tilelayer, '", true,
+                          "tilePane", "dist_code", "dist_code")
+      )
+      this.layerManager.addLayer(distLayer, "tile", "Districts", "Districts")
+      // end districts
       
       updateOpacity = function(value) {
         L.bec_layer_opacity = parseFloat(value);
@@ -312,8 +358,8 @@ addSelectBEC <- function(map) {
       };
       
       var subzLayer = L.vectorGrid.protobuf(
-        "', bcgov_tileserver, '",
-        vectorTileOptions("bec_select", "', bcgov_tilelayer, '", true,
+        "', bgc_tileserver, '",
+        vectorTileOptions("bec_select", "', bgc_tilelayer, '", true,
                           "tilePane", subzoneColors, "MAP_LABEL", "MAP_LABEL")
       )
       this.layerManager.addLayer(subzLayer, "tile", "bec_select", "BEC");
