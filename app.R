@@ -1,137 +1,12 @@
 ###Kiri Daust
 ###May 2021
-
-library(shiny)
-library(sf)
-library(data.table)
-library(shinyWidgets)
-library(ggplot2)
-library(ggiraph)
-library(scales)
-library(rhandsontable)
-library(shinyalert)
-library(RPostgreSQL)
-library(shinyjs)
-library(leafgl)
-library(leaflet)
-library(colourvalues)
-library(shinythemes)
-source("FeasAppSource.R")
-##connect to database
-###Read in climate summary data
-
-
-drv <- dbDriver("PostgreSQL")
-sapply(dbListConnections(drv), dbDisconnect)
-con <- dbConnect(drv, user = "postgres", password = "Kiriliny41", host = "68.183.199.104", 
-                 port = 5432, dbname = "spp_feas")
-
-##data for edatopic grid
-grd1x <- seq(1.5,4.5,1)
-grd1y <- seq(1.5,7.5,1)
-rects <- data.table(xmin = rep(c(0.5,2.5,3.5), each = 5),
-                    xmax = rep(c(2.5,3.5,5.5), each = 5),
-                    ymin = rep(c(0.5,1.5,3.5,5.5,7.5),3),
-                    ymax = rep(c(1.5,3.5,5.5,7.5,8.5),3))
-ids <- 1:15
-idDat <- expand.grid(SMR = 0:7, SNR = c("A","B","C","D","E"))
-idDat <- as.data.table(idDat)
-setorder(idDat,SMR,SNR)
-idDat[,ID := c(5,5,10,15,15,4,4,9,14,14,4,4,9,14,14,3,3,8,13,13,3,3,8,13,13,2,2,7,12,12,2,2,7,12,12,1,1,6,11,11)]
-idDat[,edatopic := paste0(SNR,SMR)]
-edaMaxCol <- "#440154FF"
-edaMinCol <- "#FDE725FF"
-assCols <- data.table(ID = c(1,2,3,4,5,0), 
-                        Col = c("#E20000","#FF7B00","#FFEC00","#91FB00","#1DB000","#6B6B6B"))
-assID <- data.table(assessment = c("Fail","Poor","Fair","Good","Excellent","UN"),
-                    ID = c(1,2,3,4,5,0))
-fhCols <- data.frame(hazard = c("High","Moderate","Low"), 
-                     Col = c("#D80000","#FFEF01","#0CC200"))
-
-#grRamp <- colorRamp(c(edaMaxCol,edaMinCol),alpha = T) ##colour ramp for gray values
-grRamp2 <- colorRamp(c("#443e3dFF","#c0c0c0ff"),alpha = T) ##colour ramp for gray values
-
-##initial input table for adding offsite trial
-trialInit <- data.table(
-                  spp = character(1),
-                  numplanted = numeric(1),
-                  seedlot = character(1),
-                  assessment = character(1))
-
-##setup species picker
-treelist <- fread("./inputs/Tree_List_2021.csv")
-treelist <- treelist[NotUse != "x",.(TreeCode,EnglishName, Group)]
-treelist[,TreeCode := paste0(TreeCode," - ", EnglishName)]
-#treelist <- rbind(treelist,data.table(TreeCode = "None",Group = "Conifer_BC"))
-sppList <- list()
-for(nm in c("Conifer_BC","Broadleaf_BC","Conifer_Native","Broadleaf_Native")){
-    temp <- treelist[Group == nm, TreeCode]
-    sppList[[nm]] <- temp
-}
-allSppNames <- unlist(sppList)
-allSppNames <- substr(allSppNames,1,2)
-allSppNames <- unname(allSppNames)
-
-minStart <- dbGetQuery(con,"select min(planted) from offsite")[1,1]
-maxStart <- dbGetQuery(con,"select max(planted) from offsite")[1,1]
-
-offsiteNames <- dbGetQuery(con,"select distinct plotid from offsite")[,1]
-offsiteProj <- dbGetQuery(con,"select distinct project_id from offsite")[,1]
-##max suitability colours
-##BGC colours
-zones <- sort(unique(gsub("[[:lower:]]|[[:digit:]]","", subzones_colours_ref$BGC)))
-subzones <- unique(subzones_colours_ref$BGC)
-
-subzTransparent <- copy(subzones_colours_ref)
-subzTransparent[,Col := "#FFFFFF00"]
-setnames(subzTransparent,c("bgc","Transparent"))
-
-eda <- dbGetQuery(con,"select * from eda")
-eda <- as.data.table(eda)
-suitcols <- data.table(Suit = c(1,2,3),Col = c("#443e3dFF","#736e6eFF","#a29f9eFF"))#c("#42CF20FF","#ECCD22FF","#EC0E0EFF")
-##climatic suitability colours
-zonalOpt <- "#3e6837ff"
-wetOpt <- data.table(feasible = c(1,2,3), Col = c("#c24f00ff","#cd804bff","#fbbd92ff"))
-splitOpt <- "#df00a9ff"
-dryOpt <- data.table(feasible = c(1,2,3), Col = c("#000aa3ff","#565edeff","#8b8fdbff"))
-
-##legends
-climaticLeg <- list(
-    labels = c("Climatic Optimum","Wet Site Optimum","Dry Site Optimum","Bimodal Feasibility","Off-site Addition","Removed from CFRG"),
-    colours = c(zonalOpt, wetOpt$Col[1], dryOpt$Col[1],splitOpt,"#fbff00ff","#8300ffff"),
-    title = "Climatic Feasibility"
-)
-
-edaLeg <- list(
-    labels = c("Poor Feasibility","Good Feasibility"),
-    colours = c(edaMinCol,edaMaxCol),
-    title = "Edatopic Feasibility"
-)
-
-instr <- tagList(
-    p("To use this tool:"),
-    tags$ol(
-        tags$li("Select a species code to view its range and feasibility rating on the map."),
-        tags$li("Select type of map: A) Presence/Absence, B) Climatic Suitability. C) Environmental suitability in select edatopic space 
-                (click again to return to summarised view)."),
-        tags$li("Click on a BGC polygon to display feasibility ratings in table format")),
-    tags$hr(),
-    p("Note: The values in the table can be updated and
-                                           submitted to a database unless Climatic Suitability is selected. 
-                                           To view updated feasibility toggle the Updated Feasibility Button"),
-    p("There are several other options available:"),
-    tags$ol(
-        tags$li("By default the tool shows only BC. Toggle WNA to see rating across western north america"),
-        tags$li("By default the tool does not show the BGC map. Shift slider to show colour-themed BGC"),
-        tags$li("Show locations of actual tree species collections/observations in the dataset")),
-    tags$hr()
-)
-
+source("AppSetup.R")
+source("FeasAppSource.R") ##javascript functions
 # Define UI for application that draws a histogram
 ui <- fluidPage(theme = shinytheme("lumen"),
-                fluidRow(column(6,img(src = "images/puppy1.jpg",height = "100px",align = "left"),
-                                img(src = "images/puppy2.png",height = "100px",align = "left"),
-                                img(src = "images/puppy3.jpg",height = "100px",align = "left")),column(6,h1("By BEC Map"))),
+                fluidRow(style = "background-color: #003366;",
+                    column(6,img(src = "images/gov3_bc_logo.png",align = "left")),
+                         column(6,h1("By BEC Map",style = "color: white;"))),
                 tabsetPanel(
                     tabPanel("Tree Feasibility",
                              useShinyalert(),
@@ -143,14 +18,11 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                         panel(style = "overflow-y:scroll; max-height: 900px; position:relative; align: centre",
                                               pickerInput("sppPick",
                                                           label = "Select a Species",
-                                                          choices = sppList,
-                                                          selected = "Fd"),                                         
+                                                          choices = c("None",sppList),
+                                                          selected = "Cw - western redcedar"),                                         
                                               h4("Map Display"),
                                               checkboxInput("updatedfeas","Show Updated Range and Feasibility",value = F, width = "250px"),
-                                              awesomeRadio("type",
-                                                           label = "Range",
-                                                           choices = c("Range","Climatic Suitability"),
-                                                           selected =  "Range", inline = T),
+                                              checkboxInput("showFreq","Show Frequency",value = T),
                                               h4("Edatopic Feasibility:"),
                                               girafeOutput("edaplot",height = "350px"),
                                               
@@ -224,7 +96,10 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                     h4("Update assessment in table below:"),
                                     rHandsontableOutput("assIn"),
                                     textInput("assessMod",label = "Enter your initials:"),
-                                    actionButton("submitAss","Submit Assessment")
+                                    actionButton("submitAss","Submit Assessment"),
+                                    br(),
+                                    h4("Download pest data and updates:"),
+                                    downloadButton("downloadPest")
                              )
                     ),
                     tabPanel("Forest Health",
@@ -304,18 +179,18 @@ server <- function(input, output, session) {
     })
     
     testCanAdd <- function(){
-        if(input$type == "Range" & is.null(input$edaplot_selected)){
+        if(is.null(input$edaplot_selected)){
             return(TRUE)
         }
         return(FALSE)
     }
     
-    observeEvent({c(input$type,input$map_polygon_click,input$edaplot_selected)},{
+    observeEvent({c(input$map_polygon_click,input$edaplot_selected)},{
         toggle(id = "addspp", condition = testCanAdd())
     })
     
     observe({
-        toggle(id = "submitdat", condition = input$type != "Climatic Suitability")
+        toggle(id = "submitdat", condition = input$sppPick != "None")
     })
     
     ##this is the column name in the database
@@ -339,6 +214,15 @@ server <- function(input, output, session) {
         }
     )
     
+    output$downloadPest <- downloadHandler(
+        filename = "PestUpdates.csv",
+        content = function(file){
+            dat <- dbGetQuery(con,"SELECT * FROM forhealth")
+            dat <- as.data.table(dat)
+            fwrite(dat, file)
+        }
+    )
+    
     ##base BGC map -- done
     output$map <- renderLeaflet({
         leaflet() %>%
@@ -354,10 +238,15 @@ server <- function(input, output, session) {
                 attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
                 group = "Hillshade",
                 options = leaflet::pathOptions(pane = "mapPane")) %>%
+            leaflet::addTiles(
+                urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mblbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
+                attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
+                group = "Cities",
+                options = leaflet::pathOptions(pane = "overlayPane")) %>%
             addBGCTiles() %>%
             leaflet::addLayersControl(
                 baseGroups = c("Positron","Satellite", "OpenStreetMap","Hillshade"),
-                overlayGroups = c("BGCs","Feasibility","Districts"),
+                overlayGroups = c("BGCs","Feasibility","Districts","Cities"),
                 position = "topright")
     })
     
@@ -376,10 +265,15 @@ server <- function(input, output, session) {
                 attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
                 group = "Hillshade",
                 options = leaflet::pathOptions(pane = "mapPane")) %>%
+            leaflet::addTiles(
+                urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mblbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
+                attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
+                group = "Cities",
+                options = leaflet::pathOptions(pane = "overlayPane")) %>%
             addSelectBEC() %>%
             leaflet::addLayersControl(
                 baseGroups = c("Positron","Satellite", "OpenStreetMap","Hillshade"),
-                overlayGroups = c("BEC"),
+                overlayGroups = c("BEC","Cities"),
                 position = "topright")
     })
     
@@ -420,10 +314,15 @@ server <- function(input, output, session) {
                 attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
                 group = "Hillshade",
                 options = leaflet::pathOptions(pane = "mapPane")) %>%
+            leaflet::addTiles(
+                urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mblbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
+                attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
+                group = "Cities",
+                options = leaflet::pathOptions(pane = "overlayPane")) %>%
             addBGCTiles() %>%
             leaflet::addLayersControl(
                 baseGroups = c("Positron","Satellite", "OpenStreetMap","Hillshade"),
-                overlayGroups = c("BGCs","Districts"),
+                overlayGroups = c("BGCs","Districts","Cities"),
                 position = "topright")
     })
     
@@ -552,7 +451,12 @@ server <- function(input, output, session) {
             dat$pest_name <- paste0(dat$pest," - ", dat$pest_name)
             temp <- dat$pest
             names(temp) <- dat$pest_name
-            updateSelectInput(session, "pestSpp", choices = temp)
+            pList <- list()
+            for(pcat in pestCat$pest){
+                pList[[pcat]] <- temp[temp %in% pestCat[pest == pcat,pest_code]]
+            }
+            pList[["Other"]] <- temp[!temp %in% pestCat$pest_code]
+            updateSelectInput(session, "pestSpp", choices = pList)
         }
     })
     
@@ -570,10 +474,15 @@ server <- function(input, output, session) {
                 attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
                 group = "Hillshade",
                 options = leaflet::pathOptions(pane = "mapPane")) %>%
+            leaflet::addTiles(
+                urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mblbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
+                attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
+                group = "Cities",
+                options = leaflet::pathOptions(pane = "overlayPane")) %>%
             addBGCTiles() %>%
             leaflet::addLayersControl(
                 baseGroups = c("Positron","Satellite", "OpenStreetMap","Hillshade"),
-                overlayGroups = c("BGCs","Pests","Districts"),
+                overlayGroups = c("BGCs","Pests","Districts","Cities"),
                 position = "topright") %>%
             addLegend(position = "bottomright",
                        labels = c("Unspecified","Low","Moderate","High","Outside Range"),
@@ -724,7 +633,8 @@ server <- function(input, output, session) {
                   AND forhealth.pest = temp_fh.pest
                   AND forhealth.bgc = temp_fh.bgc")
         }
-        shinyalert("Thank you!","Your updates have been recorded", type = "info", inputId = "fhMessage")
+        shinyalert("Thank you!","Your updates have been recorded", type = "info",
+                   imageUrl = "images/puppy1.jpg",imageHeight = "100px",inputId = "fhMessage")
     })
     
     observeEvent(input$submitFHLong,{
@@ -741,7 +651,8 @@ server <- function(input, output, session) {
                   AND forhealth.pest = temp_fh.pest
                   AND forhealth.bgc = temp_fh.bgc")
         }
-        shinyalert("Thank you!","Your updates have been recorded", type = "info", inputId = "fhMessage")
+        shinyalert("Thank you!","Your updates have been recorded", type = "info",
+                   imageUrl = "images/puppy1.jpg",imageHeight = "100px", inputId = "fhMessage")
     })
     
     
@@ -773,6 +684,8 @@ server <- function(input, output, session) {
                                                        "') and planted > '", input$trialStart[1],"' and planted < '",input$trialStart[2],"'"))
                             if(nrow(dat2) == 0){
                                 dat2 <- NULL
+                                leafletProxy("map") %>%
+                                    removeGlPoints("tree_trial")
                             }else{
                                 dat <- as.data.table(st_drop_geometry(dat2))
                                 dat[assID, ID := i.ID, on = "assessment"]
@@ -818,16 +731,29 @@ server <- function(input, output, session) {
         feas <- as.data.table(d1)
         setnames(feas, old = globalFeas$dat, new = "feasible")
         feasMax <- feas[,.(SuitMax = min(feasible)), by = .(bgc,sppsplit)]
-        if(input$type == "Range"){
+        if(input$showFreq){
+            feasMax <- prepFreq()
+            sppOpts <- unique(feasMax$sppsplit)
+            feasMax[,sppsplit := as.numeric(as.factor(sppsplit))]
+            feasMax[taxaFreqCols, Col := i.Col, on = c("sppsplit","Freq")]
+            feasMax[Freq == "Added",Col := "#fbff00ff"]
+            feasMax[Freq == "Removed",Col := "#8300ffff"]
+            PALeg <- list(
+                labels = c(sppOpts,"Added","Removed"),
+                colours = c(taxaCols[1:length(sppOpts)],"#fbff00ff","#8300ffff"),
+                title = "Presence/Absence"
+            )
+            globalLeg$Legend <- PALeg
+        }else{
             if(length(unique(feasMax$sppsplit)) > 1){
-                feasMax[,SppNum := as.numeric(as.factor(sppsplit))]
-                tempCol <- grRamp2(rescale(feasMax$SppNum,to = c(0,0.6)))
-                feasMax[,Col := rgb(tempCol[,1],tempCol[,2],tempCol[,3],tempCol[,4], maxColorValue = 255)]
+                temp <- unique(feasMax$sppsplit)
+                tempTab <- data.table(sppsplit = temp, Col = taxaCols[1:length(temp)])
+                feasMax[tempTab,Col := i.Col, on = "sppsplit"]
                 temp <- unique(feasMax[,.(sppsplit,Col)])
                 
                 PALeg <- list(
-                    labels = c(temp$sppsplit,"Added","Removed"),
-                    colours = c(temp$Col,"#fbff00ff","#8300ffff"),
+                    labels = c(tempTab$sppsplit,"Added","Removed"),
+                    colours = c(tempTab$Col,"#fbff00ff","#8300ffff"),
                     title = "Presence/Absence"
                 )
                 globalLeg$Legend <- PALeg
@@ -845,16 +771,56 @@ server <- function(input, output, session) {
                 )
                 globalLeg$Legend <- PALeg
             }
-        }else if(input$type == "Max Suit"){
-            feasMax[suitcols, Col := i.Col, on = c(SuitMax = "Suit")]
-            #globalLeg$Legend <- maxSuitLeg
-        }else{
-            feasMax <- prepClimSuit()
-            globalLeg$Legend <- climaticLeg
         }
         feasMax[,Lab := bgc]
         feasMax[,.(bgc,Col,Lab)]
+    })
+    
+    prepFreq <- reactive({
+        QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
+                        " from feasorig where spp = '",substr(input$sppPick,1,2),
+                        "' and ",globalFeas$dat," in (1,2,3,4,5)")
+        feas <- as.data.table(dbGetQuery(con, QRY))
+        setnames(feas, old = globalFeas$dat, new = "feasible")
+        minDist <- feas[,.SD[feasible == min(feasible, na.rm = T)],by = .(bgc,sppsplit)]
+        tf2 <- minDist[feasible %in% c(4,5),]
+        minDist <- minDist[feasible %in% c(1,2,3),]
+        abUnits <- minDist[grep("[[:alpha:]] */[[:alpha:]]+$",ss_nospace),]
+        noAb <- minDist[!grepl("[[:alpha:]] */[[:alpha:]]+$",ss_nospace),]
+        abUnits <- eda[abUnits, on = "ss_nospace"] ##merge
+        abUnits <- abUnits[,.(Temp = if(any(grepl("C4",edatopic))) paste0(ss_nospace,"_01") else ss_nospace, feasible = feasible[1]),
+                           by = .(bgc,ss_nospace,sppsplit,spp)]
+        abUnits[,ss_nospace := NULL]
+        setnames(abUnits,old = "Temp",new = "ss_nospace")
+        minDist <- rbind(noAb,abUnits)
+        minDist[,ID := if(any(grepl("01", ss_nospace)) & feasible[1] == 1) T else F, by = .(bgc,sppsplit)]
+        minDist[,Freq := NA_character_]
+        minDist[(ID),Freq := "High"]
         
+        minDist2 <- minDist[ID == F,]
+        minDist2[,ID := if(any(grepl("01", ss_nospace))) T else F, by = .(bgc,sppsplit)]
+        minDist2[(ID),Freq := "Moderate"]
+        
+        minDist3 <- minDist2[ID == F,]
+        minEda <- eda[minDist3, on = "ss_nospace"]
+        minEda <- minEda[,.(AvgEda = mean(smr)), by = .(bgc,sppsplit,ss_nospace,feasible)]
+        minEda[,CentEda := abs(AvgEda - 3.5)]
+        minEda <- minEda[,.SD[CentEda == min(CentEda, na.rm = T)], by = .(bgc,sppsplit)]
+        lookupTab <- data.table(AvgEda = c(0,2,5,7),Freq = c("Low","Moderate","Low","Low"))
+        temp <- lookupTab[minEda, on = "AvgEda", roll = T]
+        
+        t1 <- minDist[!is.na(Freq),.(Freq = Freq[1]), by = .(bgc,sppsplit)]
+        t2 <- minDist2[!is.na(Freq),.(Freq = Freq[1]), by = .(bgc,sppsplit)]
+        t3 <- temp[,.(Freq = Freq[1]), by = .(bgc,sppsplit)]
+        allFreq <- rbind(t1,t2,t3)
+        
+        if(nrow(tf2) > 0){
+            tf2[feasible == 4,Freq := "Added"]
+            tf2[feasible == 5,Freq := "Removed"]
+            tf2 <- tf2[,.(Freq = Freq[1]), by = .(bgc,sppsplit)]
+            allFreq <- rbind(allFreq, tf2)
+        }
+        allFreq
     })
     
     ##Prepare BGC colours for edatopic option
@@ -879,87 +845,38 @@ server <- function(input, output, session) {
         feasSum[,.(bgc,Col,Lab)]
     })
     
-    ###calculate climatic suitability colours
-    prepClimSuit <- reactive({
-        QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
-                      " from feasorig where spp = '",substr(input$sppPick,1,2),
-                      "' and ",globalFeas$dat," in (1,2,3,4,5)")
-        feas <- as.data.table(dbGetQuery(con, QRY))
-        setnames(feas, old = globalFeas$dat, new = "feasible")
-        tempFeas <- feas[feasible %in% c(1,2,3),]
-        minDist <- tempFeas[,.SD[feasible == min(feasible, na.rm = T)],by = .(bgc)]
-        abUnits <- minDist[grep("[[:alpha:]] */[[:alpha:]]+$",ss_nospace),]
-        noAb <- minDist[!grepl("[[:alpha:]] */[[:alpha:]]+$",ss_nospace),]
-        abUnits <- eda[abUnits, on = "ss_nospace"] ##merge
-        abUnits <- abUnits[,.(Temp = if(any(grepl("C4",edatopic))) paste0(ss_nospace,"_01") else ss_nospace, feasible = feasible[1]),
-                           by = .(bgc,ss_nospace,sppsplit,spp)]
-        abUnits[,ss_nospace := NULL]
-        setnames(abUnits,old = "Temp",new = "ss_nospace")
-        minDist <- rbind(noAb,abUnits)
-        minDist[,ID := if(any(grepl("01", ss_nospace)) & feasible[1] == 1) T else F, by = .(bgc)]
-        green <- minDist[(ID),]
-        green <- green[,.(Col = zonalOpt), by = .(bgc)]
-        
-        minDist <- minDist[ID == F,]
-        minDist[,ID := if(any(grepl("01", ss_nospace))) T else F, by = .(bgc)]
-        blue <- minDist[(ID),]
-        blue <- blue[,.(feasible = min(feasible)), by = .(bgc)]
-        
-        minDist <- minDist[ID == F,]
-        minEda <- eda[minDist, on = "ss_nospace"]
-        minEda <- minEda[,.(AvgEda = mean(smr)), by = .(bgc,ss_nospace,feasible)]
-        minEda <- minEda[,.(Col = fifelse(all(AvgEda >= 3.5),"WET",
-                                          fifelse(all(AvgEda < 3.5), "DRY", splitOpt)), feasible = min(feasible)), by = .(bgc)]
-        temp <- minEda[Col == "DRY",]
-        temp[,Col := NULL]
-        blue <- rbind(blue,temp)
-        red <- minEda[Col == "WET",]
-        minEda <- minEda[!Col %in% c("WET","DRY"),.(bgc,Col)]
-        blue[dryOpt, Col := i.Col, on = "feasible"]
-        red[wetOpt, Col := i.Col, on = "feasible"]
-        blue[,feasible := NULL]
-        red[,feasible := NULL]
-        climSuit <- rbind(green,blue,red,minEda)
-        climSuit <- climSuit[!is.na(bgc),]
-        
-        tf2 <- feas[feasible %in% c(4,5),.(SuitMax = min(feasible)), by = .(bgc)]
-        if(nrow(tf2) > 0){
-            tf2[SuitMax == 4,Col := "#fbff00ff"]
-            tf2[SuitMax == 5,Col := "#8300ffff"]
-            tf2 <- tf2[,.(bgc,Col)]
-            climSuit <- rbind(climSuit, tf2)
-        }
-        return(climSuit)
-    })
-
+    
     observeEvent({c(
         input$sppPick,
-        input$type,
         input$edaplot_selected,
-        input$updatedfeas)
+        input$updatedfeas,
+        input$showFreq)
     },{
-    if(is.null(input$edaplot_selected)){
-        dat <- prepDatSimple()
-    }else{
-        dat <- prepEdaDat()
-    }
-    if(is.null(dat)){
-        dat <- NULL
-        session$sendCustomMessage("clearLayer", "Delete")
-    }else{
-        print("Rendering map")
-        dat <- dat[subzTransparent, on = "bgc"]
-        dat[is.na(Col),Col := Transparent]
-        dat[is.na(Lab),Lab := bgc]
-        
-        leafletProxy("map") %>%
-            invokeMethod(data = dat, method = "addGridTiles", dat$bgc, dat$Col,dat$Lab) %>%
-            addLegend(position = "bottomright",
-                      labels = globalLeg$Legend$labels,
-                      colors = globalLeg$Legend$colours,
-                      title = globalLeg$Legend$title,
-                      layerId = "bec_feas") 
-    }
+        if(input$sppPick == "None"){
+            session$sendCustomMessage("clearLayer","xxx")
+        }else{
+            if(is.null(input$edaplot_selected)){
+                dat <- prepDatSimple()
+            }else{
+                dat <- prepEdaDat()
+            }
+            if(is.null(dat)){
+                dat <- NULL
+                session$sendCustomMessage("clearLayer", "Delete")
+            }else{
+                print("Rendering map")
+                dat <- dat[subzTransparent, on = "bgc"]
+                dat[is.na(Col),Col := Transparent]
+                dat[is.na(Lab),Lab := bgc]
+                leafletProxy("map") %>%
+                    invokeMethod(data = dat, method = "addGridTiles", ~bgc, ~Col, ~Lab) %>%
+                    addLegend(position = "bottomright",
+                              labels = globalLeg$Legend$labels,
+                              colors = globalLeg$Legend$colours,
+                              title = globalLeg$Legend$title,
+                              layerId = "bec_feas") 
+            }
+        }
 }, priority = 15)
 
     output$tableBGC <- renderUI({
@@ -987,20 +904,19 @@ server <- function(input, output, session) {
         }
         setnames(feas, old = globalFeas$dat, new = "feasible")   
         if(is.null(input$edaplot_selected)){
-            if(input$type == "Climatic Suitability"){
-                tempFeas <- feas[feasible %in% c(1,2,3),]
-                tempEda <- eda[tempFeas, on = "ss_nospace"]
-                tempEda <- tempEda[!is.na(smr),]
-                tempEda <- tempEda[,.(AvgSMR = mean(smr)), by = .(ss_nospace,feasible,sppsplit)]
-                tempEda[,SSType := fifelse(grepl("01",ss_nospace),"Zonal",fifelse(AvgSMR <= 3.5,"Dry",
-                                                                                  fifelse(AvgSMR > 4.1,"Wet","??")))]
-                tabOut <- dcast(tempEda, SSType ~ sppsplit, value.var = "feasible", fun.aggregate = min)
-                tabOut[tabOut == 0] <- NA
-            }else{
+            # if(input$type == "Climatic Suitability"){
+            #     tempFeas <- feas[feasible %in% c(1,2,3),]
+            #     tempEda <- eda[tempFeas, on = "ss_nospace"]
+            #     tempEda <- tempEda[!is.na(smr),]
+            #     tempEda <- tempEda[,.(AvgSMR = mean(smr)), by = .(ss_nospace,feasible,sppsplit)]
+            #     tempEda[,SSType := fifelse(grepl("01",ss_nospace),"Zonal",fifelse(AvgSMR <= 3.5,"Dry",
+            #                                                                       fifelse(AvgSMR > 4.1,"Wet","??")))]
+            #     tabOut <- dcast(tempEda, SSType ~ sppsplit, value.var = "feasible", fun.aggregate = min)
+            #     tabOut[tabOut == 0] <- NA
+            # }else{
                 feasSub <- feas[sppsplit != "X",]
                 tabOut <- data.table::dcast(feasSub, ss_nospace ~ sppsplit,fun.aggregate = mean, value.var = "feasible")
                 tabOut[,lapply(.SD,as.integer),.SDcols = -"ss_nospace"]
-            }
         }else{
             id <- as.numeric(input$edaplot_selected)
             idSub <- idDat[ID == id,.(ID,edatopic)]
@@ -1085,7 +1001,7 @@ server <- function(input, output, session) {
     
     ##ask for initials and call sendToDb
     observeEvent(input$submitdat,{
-        shinyalert("Enter your initials:", type = "input", inputId = "initials", callbackR = sendToDb)
+        shinyalert("Enter your initials:", type = "input",imageUrl = "images/puppy1.jpg",imageHeight = "100px", inputId = "initials", callbackR = sendToDb)
     })
         
     ##compile and send updates to database
@@ -1104,7 +1020,8 @@ server <- function(input, output, session) {
                   SET newfeas = 5
                   WHERE newfeas IS NULL
                   AND feasible IS NOT NULL")
-        shinyalert("Thank you!","Your updates have been recorded", type = "info", inputId = "dbmessage")
+        shinyalert("Thank you!","Your updates have been recorded", type = "info",
+                   imageUrl = "images/puppy1.jpg",imageHeight = "100px", inputId = "dbmessage")
 
     }
     
@@ -1145,7 +1062,8 @@ server <- function(input, output, session) {
             
             dat2 <- dat2[!is.na(newfeas),]
             dbWriteTable(con, name = "feasorig", value = dat2, append = T,row.names = F)
-            shinyalert("Thank you!","Your updates have been recorded", type = "info", inputId = "dbmessage")
+            shinyalert("Thank you!","Your updates have been recorded", type = "info",
+                       imageUrl = "images/puppy1.jpg",imageHeight = "100px",inputId = "dbmessage")
         }
     }
 
@@ -1174,11 +1092,7 @@ server <- function(input, output, session) {
     ##table caption
     output$tableInfo <- renderText({
         if(is.null(input$edaplot_selected)){
-            if(input$type == "Climatic Suitability"){
-                "Zonal feasibility and maximum feasibility in wetter and drier sites"
-            }else{
                 "Maximum feasibility by subzone"
-            }
         }else{
             "Feasibility for each site series overlapping selected edatopic area"
         }
@@ -1191,3 +1105,56 @@ server <- function(input, output, session) {
 
 # Run the application 
 shinyApp(ui = ui, server = server)
+
+# ###calculate climatic suitability colours
+# prepClimSuit <- reactive({
+#     QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
+#                   " from feasorig where spp = '",substr(input$sppPick,1,2),
+#                   "' and ",globalFeas$dat," in (1,2,3,4,5)")
+#     feas <- as.data.table(dbGetQuery(con, QRY))
+#     setnames(feas, old = globalFeas$dat, new = "feasible")
+#     tempFeas <- feas[feasible %in% c(1,2,3),]
+#     minDist <- tempFeas[,.SD[feasible == min(feasible, na.rm = T)],by = .(bgc)]
+#     abUnits <- minDist[grep("[[:alpha:]] */[[:alpha:]]+$",ss_nospace),]
+#     noAb <- minDist[!grepl("[[:alpha:]] */[[:alpha:]]+$",ss_nospace),]
+#     abUnits <- eda[abUnits, on = "ss_nospace"] ##merge
+#     abUnits <- abUnits[,.(Temp = if(any(grepl("C4",edatopic))) paste0(ss_nospace,"_01") else ss_nospace, feasible = feasible[1]),
+#                        by = .(bgc,ss_nospace,sppsplit,spp)]
+#     abUnits[,ss_nospace := NULL]
+#     setnames(abUnits,old = "Temp",new = "ss_nospace")
+#     minDist <- rbind(noAb,abUnits)
+#     minDist[,ID := if(any(grepl("01", ss_nospace)) & feasible[1] == 1) T else F, by = .(bgc)]
+#     green <- minDist[(ID),]
+#     green <- green[,.(Col = zonalOpt), by = .(bgc)]
+#     
+#     minDist <- minDist[ID == F,]
+#     minDist[,ID := if(any(grepl("01", ss_nospace))) T else F, by = .(bgc)]
+#     blue <- minDist[(ID),]
+#     blue <- blue[,.(feasible = min(feasible)), by = .(bgc)]
+#     
+#     minDist <- minDist[ID == F,]
+#     minEda <- eda[minDist, on = "ss_nospace"]
+#     minEda <- minEda[,.(AvgEda = mean(smr)), by = .(bgc,ss_nospace,feasible)]
+#     minEda <- minEda[,.(Col = fifelse(all(AvgEda >= 3.5),"WET",
+#                                       fifelse(all(AvgEda < 3.5), "DRY", splitOpt)), feasible = min(feasible)), by = .(bgc)]
+#     temp <- minEda[Col == "DRY",]
+#     temp[,Col := NULL]
+#     blue <- rbind(blue,temp)
+#     red <- minEda[Col == "WET",]
+#     minEda <- minEda[!Col %in% c("WET","DRY"),.(bgc,Col)]
+#     blue[dryOpt, Col := i.Col, on = "feasible"]
+#     red[wetOpt, Col := i.Col, on = "feasible"]
+#     blue[,feasible := NULL]
+#     red[,feasible := NULL]
+#     climSuit <- rbind(green,blue,red,minEda)
+#     climSuit <- climSuit[!is.na(bgc),]
+#     
+#     tf2 <- feas[feasible %in% c(4,5),.(SuitMax = min(feasible)), by = .(bgc)]
+#     if(nrow(tf2) > 0){
+#         tf2[SuitMax == 4,Col := "#fbff00ff"]
+#         tf2[SuitMax == 5,Col := "#8300ffff"]
+#         tf2 <- tf2[,.(bgc,Col)]
+#         climSuit <- rbind(climSuit, tf2)
+#     }
+#     return(climSuit)
+# })

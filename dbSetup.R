@@ -13,9 +13,9 @@ dbSafeNames = function(names) {
   names
 }
 
-feas <- fread("./inputs/Feasibility_v12_1.csv")
-feas <- feas[,.(BGC,SS_NoSpace,Spp,Feasible)]
-setnames(feas, old = "Spp",new = "SppSplit")
+feas <- fread("~/CommonTables/Feasibility_v12_3.csv")
+feas <- feas[,.(BGC,SS_NoSpace,SppVar,Feasible)]
+setnames(feas, old = "SppVar",new = "SppSplit")
 feas[,Spp := SppSplit]
 feas[SppSplit %in% c("Fdi","Fdc"),Spp := "Fd"]
 feas[SppSplit %in% c("Pli","Plc"),Spp := "Pl"]
@@ -25,10 +25,11 @@ feas[SppSplit %in% c("Pyi","Pyc"),Spp := "Py"]
 feas[SppSplit %in% c("Acb","Act"),Spp := "Ac"]
 setnames(feas,c("bgc","ss_nospace","sppsplit","feasible","spp"))
 feas[,newfeas := feasible]
-feas[,mod := NA]
+feas[,mod := NA_character_]
+feas <- feas[sppsplit != "X",]
 
-eda <- fread("./inputs/Edatopic_v12_1.csv")
-eda <- eda[is.na(Special),.(BGC,SS_NoSpace,Edatopic)]
+eda <- fread("~/CommonTables/Edatopic_v12_3.csv")
+eda <- eda[is.na(Special) | Special == "",.(BGC,SS_NoSpace,Edatopic)]
 eda[,SMR := as.numeric(gsub("[[:alpha:]]","", Edatopic))]
 feas <- feas[ss_nospace %chin% eda$SS_NoSpace,]
 setnames(eda,dbSafeNames(colnames(eda)))
@@ -122,3 +123,15 @@ st_write(datAll,dsn = con, "offsite")
 dbExecute(con,"create index on offsite(spp)")
 dbExecute(con,"create index on offsite(project_id,spp,planted)")
 d2 <- st_read(con, query = "select * from offsite where spp = 'Lw'")
+
+dat <- dbGetQuery(con,"select * from forhealth")
+dat <- as.data.table(dat)
+feas <- dbGetQuery(con, "select * from feasorig where spp in ('Ba','Bg','Bl')")
+feas <- as.data.table(feas)
+feas <- feas[,.(feasible = min(feasible)),by =.(spp,bgc)]
+dat[feas,feasible := i.feasible, on = c(treecode = "spp","bgc")]
+dat <- dat[!(treecode %in% c("Ba","Bg","Bl") & is.na(feasible)),]
+dat[,feasible := NULL]
+
+dbExecute(con,"drop table forhealth")
+dbWriteTable(con,"forhealth",dat,row.names = F)

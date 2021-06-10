@@ -6,9 +6,6 @@ bgc_tilelayer <- "WNA_MAP"
 district_tileserver <- "http://159.203.20.90/data/Districts/{z}/{x}/{y}.pbf"
 district_tilelayer <- "Districts"
 
-subzones_colours_ref <- fread("./inputs/WNA_v12_HexCols.csv")
-setnames(subzones_colours_ref,c("BGC","Col"))
-
 plugins <- {list(vgplugin = 
          htmltools::htmlDependency(
            name = "leaflet.vectorgrid",
@@ -115,13 +112,13 @@ jscode_feas <- paste0('window.LeafletWidget.methods.addGridTiles = function(BGC,
           };
           
       
-      //Shiny.addCustomMessageHandler("highlight",function(BECSelect){
-      //  if(selectHighlight){
-      //    subzLayer.resetFeatureStyle(selectHighlight);
-      //    selectHighlight = BECSelect;
-      //    subzLayer.setFeatureStyle(BECSelect, styleHL);
-      //  }
-      //});
+      Shiny.addCustomMessageHandler("highlight",function(BECSelect){
+        if(selectHighlight){
+          subzLayer.resetFeatureStyle(selectHighlight);
+          selectHighlight = BECSelect;
+          subzLayer.setFeatureStyle(BECSelect, styleHL);
+        }
+      });
       
       //make layer transparent if no data
       let styleCLR = {
