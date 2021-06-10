@@ -11,7 +11,7 @@ L.Control.Slider = L.Control.extend({
         step: 1,
         id: "slider",
         value: 50,
-        collapsed: true,
+        collapsed: false,
         title: 'Leaflet Slider',
         logo: 'S',
         orientation: 'horizontal',

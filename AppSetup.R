@@ -53,7 +53,7 @@ fhCols <- data.frame(hazard = c("High","Moderate","Low"),
 taxaCols <- c("#443e3d","#876114","#3d7075","#443e3d","#443e3d")
 taxaFreqCols <- data.table(sppsplit = c(1,1,1,2,2,2,3,3,3),
                            Freq = c(rep(c("High","Moderate","Low"),3)),
-                           Col = c("#443e3d","#78716f","#d4d4d4",
+                           Col = c("#443e3d","#78716f","#828282",
                                    "#876114","#bf994d","#f5ce7f",
                                    "#3d7075","#75c0c7","#bff0f5"))
 
@@ -86,7 +86,8 @@ offsiteNames <- dbGetQuery(con,"select distinct plotid from offsite")[,1]
 offsiteProj <- dbGetQuery(con,"select distinct project_id from offsite")[,1]
 ##max suitability colours
 ##BGC colours
-zones <- sort(unique(gsub("[[:lower:]]|[[:digit:]]","", subzones_colours_ref$BGC)))
+zones <- fread("inputs/BGCZones.csv")
+zones <- zones$Zone
 subzones <- unique(subzones_colours_ref$BGC)
 
 subzTransparent <- copy(subzones_colours_ref)

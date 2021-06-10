@@ -304,7 +304,7 @@ addBGCTiles <- function(map) {
         id:"opacity_slider",
         orientation:"horizontal",
         position:"bottomleft",
-        logo:\'<img src="www/opacity.svg" />\',
+        logo:\'<img src="opacity.svg" />\',
         max:1,
         title: "BGC Opacity",
         step:0.01,
@@ -329,7 +329,7 @@ addSelectBEC <- function(map) {
     function(el, x, data) {
       ', paste0("var subzoneColors = {", paste0("'", subzones_colours_ref$BGC, "':'", subzones_colours_ref$Col,"'", collapse = ","), "}"), '
       
-      //L.bec_layer_opacity = 0.8
+      L.bec_layer_opacity2 = 0.25
       
       var vectorTileOptions=function(layerName, layerId, activ,
                              lfPane, colorMap, prop, id) {
@@ -342,7 +342,7 @@ addSelectBEC <- function(map) {
                 weight: 0,
                 fillColor: colorMap[properties[prop]],
                 fill: true,
-                fillOpacity: L.bec_layer_opacity
+                fillOpacity: L.bec_layer_opacity2
               }
             }
           },
@@ -408,30 +408,35 @@ addSelectBEC <- function(map) {
           });
           Shiny.setInputValue("becselect_click",BECSelect);
         }
-        
       });
       
-      //bec layer tooltip
+      Shiny.addCustomMessageHandler("clearBEC",function(x){
+          selectHighlight.forEach((ID,i) => {
+            subzLayer.resetFeatureStyle(ID);
+          });
+      });
+      
       subzLayer.bindTooltip(function(e) {
-        return tooltipLabs[e.properties.MAP_LABEL]
+        return e.properties.MAP_LABEL
       }, {sticky: true, textsize: "10px", opacity: 1});
+      subzLayer.bringToFront();
       
       updateOpacity = function(value) {
-        L.bec_layer_opacity = parseFloat(value);
+        L.bec_layer_opacity2 = parseFloat(value);
       }
       
       var opacityslider2 = L.control.slider(updateOpacity, {
         id:"opacity_slider2",
         orientation:"horizontal",
         position:"bottomleft",
-        logo:\'<img src="www/opacity.svg" />\',
+        logo:\'<img src="opacity.svg" />\',
         max:1,
         step:0.01,
         syncSlider:true,
         size:"250px",
         title: "Adjust BGC Opacity",
         // Starting opacity value for bec map layers
-        value:0.8,
+        value:0.25,
         showValue:true
       })
       opacityslider2.addTo(this);
