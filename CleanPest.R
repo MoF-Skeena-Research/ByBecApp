@@ -136,3 +136,53 @@ setnames(pest3,old = c("EnglishName","TreeCode","BGC"),new = c("host_common","ho
 setcolorder(pest3,c("pest_code","pest","pest_common","pest_scientific","host_code","host_common","host_scientific",
                     "bgc","zone", "subzone","variant","Hazard"))
 fwrite(pest3,"Pest_HighHazard_Clean.csv")
+
+###new pest matrix
+dat1[PEST_SPECIES_LATIN_NAME == "", PEST_SPECIES_LATIN_NAME := PEST_SPECIES_COMMON_NAME]
+dat1 <- dat1[,!c("PEST_TYPE")]
+colnames(dat1)[1:2] <- c("pest","pest_name")
+dat1 <- melt(dat1,id.vars = c("pest","pest_name"),variable.name = "treecode",value.name = "Presence")
+dat1 <- na.omit(dat1)
+
+dat2[PEST_SPECIES_LATIN_NAME == "", PEST_SPECIES_LATIN_NAME := PEST_SPECIES_COMMON_NAME]
+dat2 <- dat2[,!c("Use","PESTGROUP","PEST_TYPE","PEST_SPECIES_COMMON_NAME")]
+colnames(dat2)[1:2] <- c("pest","pest_name")
+dat2 <- melt(dat2,id.vars = c("pest","pest_name"),variable.name = "treecode",value.name = "Presence")
+dat2 <- na.omit(dat2)
+datAll <- rbind(dat1,dat2)
+
+newPests <- unique(datAll$pest)
+allSpp <- as.character(unique(datAll$treecode))
+feas <- fread("~/CommonTables/Feasibility_v12_3.csv")
+feas <- feas[Feasible %in% c(1,2,3),]
+feas[,Spp := substr(SppVar, 1,2)]
+feas <- feas[Spp %chin% allSpp,]
+feas <- feas[BGC %chin% BGCDat$BGC,]
+feas <- feas[,.(MF = max(Feasible)), by = .(Spp,SppVar,BGC)]
+feas <- feas[,.(Spp,BGC)]
+
+allOptions <- feas[datAll,on = c(Spp = "treecode"),allow.cartesian = T]
+allOptions[,ID := "UN"]
+prevPest <- as.data.table(dbGetQuery(con, "select * from forhealth"))
+colnames(allOptions)[1:2] <- c("treecode","bgc")
+allDat <- prevPest[allOptions, on = c("bgc","treecode","pest")]
+new <- allDat[is.na(hazard),.(bgc,treecode,pest,i.pest_name,hazard,hazard_update,mod)]
+setnames(new,old = "i.pest_name",new = "pest_name")
+new[is.na(hazard),hazard := "UN"]
+new[,hazard_update := hazard]
+new[,mod := NA]
+dbWriteTable(con,"forhealth",new,append = T, row.names = F)
+
+temp <- fread(file.choose())
+temp <- temp[Use == 'y',.(PESTGROUP, PEST_TYPE,PEST_SPECIES_CODE)]
+setnames(temp,c("Group","pest","pest_code"))
+temp[pest == "",pest := Group]
+temp[,Group := NULL]
+temp[,pest := tolower(pest)]
+pestCat <- rbind(pestCat,temp)
+
+d1 <- fread(file.choose())
+d1 <- d1[Use == 'y',]
+d1[PEST_SPECIES_LATIN_NAME == "", PEST_SPECIES_LATIN_NAME := PEST_SPECIES_COMMON_NAME]
+d1 <- d1[,!c("Use","PEST_TYPE","PEST_SPECIES_LATIN_NAME")]
+fwrite(d1,"Pest_Host_Decid.csv")

@@ -51,12 +51,12 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                             rHandsontableOutput("hot"),
                                             br(),
                                             hidden(actionBttn("submitdat", label = "Submit Changes!")),
-                                            hidden(actionBttn("addspp","Add Species")),
+                                            actionBttn("addspp","Add Species"),
                                             h4("Download feasibility data and updates:"),
-                                            downloadButton("downloadFeas")
+                                            downloadButton("downloadFeas",label = "Feasibility"),
+                                            downloadButton("downloadAudit",label = "Audit Table")
                                         )
                                  )
-                                 
                              )
                     ),
                     tabPanel("Off-site Trials",
@@ -112,6 +112,7 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                                 label = "Select Pest",
                                                 choices = c("DRN","DRL","IDW"),
                                                 multiple = F),
+                                    actionButton("showMatrix","Show Pest-by-Host Table"),
                                     h3("Hazard By BGC"),
                                     rHandsontableOutput("fh_hot_long"),
                                     textInput("fhModLong",label = "Enter your initials:"),
@@ -213,6 +214,15 @@ server <- function(input, output, session) {
             dat <- dbGetQuery(con,"SELECT bgc,ss_nospace,sppsplit,feasible,newfeas,mod FROM feasorig")
             dat <- as.data.table(dat)
             setnames(dat, old = "sppsplit",new = "spp")
+            fwrite(dat, file)
+        }
+    )
+    
+    output$downloadAudit <- downloadHandler(
+        filename = "FeasibilityAudit.csv",
+        content = function(file){
+            dat <- dbGetQuery(con,"SELECT * FROM feas_audit")
+            dat <- as.data.table(dat)
             fwrite(dat, file)
         }
     )
@@ -528,6 +538,8 @@ server <- function(input, output, session) {
             dat[rangeDat, InRange := i.Col, on = "bgc"]
             dat[is.na(InRange), fhcol := "#840090"]
             session$sendCustomMessage("colourPest",dat[,.(bgc,fhcol)])
+        }else{
+            session$sendCustomMessage("clearPest","puppy")
         }
         
     })
@@ -663,6 +675,47 @@ server <- function(input, output, session) {
                    imageUrl = "images/puppy1.jpg",imageHeight = "100px", inputId = "fhMessage")
     })
     
+    observeEvent(input$showMatrix,{
+        shinyalert(html = T,
+                   text = tagList(
+                       radioButtons("matrixType",
+                                   label = "Show matrix of:",
+                                   choices = c("Conifer","Deciduous"),
+                                   selected = "Conifer",
+                                   inline = T), 
+                       br(),
+                       br(),
+                       panel(style = "overflow-y:scroll; max-height: 400px; position:relative; align: centre",
+                             rHandsontableOutput("hot_pestMat") 
+                             ),
+                       
+                   ),
+                   showConfirmButton = T,
+                   size = 'l')
+    })
+    
+    output$hot_pestMat <- renderRHandsontable({
+        if(input$matrixType == "Conifer"){
+            dat <- fread("./inputs/Pest_Host_Conifer.csv")
+        }else{
+            dat <- fread("./inputs/Pest_Host_Decid.csv")
+        }
+        rhandsontable(dat) %>%
+            hot_cols(renderer = 
+                         "function(instance, td, row, col, prop, value, cellProperties) {
+                                                    Handsontable.renderers.TextRenderer.apply(this, arguments);
+                                                  if(value == 1) { 
+                                                        td.style.background = '#ff3936'; 
+                                                    }
+                                                    if(value == 2){
+                                                        td.style.background = '#ff6836'; 
+                                                    }
+                                                    if(value == 3){
+                                                        td.style.background = '#ffd036'; 
+                                                    }
+                                                }")
+    })
+
     
     ##end for health tab###
     
@@ -912,16 +965,6 @@ server <- function(input, output, session) {
         }
         setnames(feas, old = globalFeas$dat, new = "feasible")   
         if(is.null(input$edaplot_selected)){
-            # if(input$type == "Climatic Suitability"){
-            #     tempFeas <- feas[feasible %in% c(1,2,3),]
-            #     tempEda <- eda[tempFeas, on = "ss_nospace"]
-            #     tempEda <- tempEda[!is.na(smr),]
-            #     tempEda <- tempEda[,.(AvgSMR = mean(smr)), by = .(ss_nospace,feasible,sppsplit)]
-            #     tempEda[,SSType := fifelse(grepl("01",ss_nospace),"Zonal",fifelse(AvgSMR <= 3.5,"Dry",
-            #                                                                       fifelse(AvgSMR > 4.1,"Wet","??")))]
-            #     tabOut <- dcast(tempEda, SSType ~ sppsplit, value.var = "feasible", fun.aggregate = min)
-            #     tabOut[tabOut == 0] <- NA
-            # }else{
                 feasSub <- feas[sppsplit != "X",]
                 tabOut <- data.table::dcast(feasSub, ss_nospace ~ sppsplit,fun.aggregate = mean, value.var = "feasible")
                 tabOut[,lapply(.SD,as.integer),.SDcols = -"ss_nospace"]
@@ -1015,19 +1058,41 @@ server <- function(input, output, session) {
     ##compile and send updates to database
     sendToDb <- function(nme){
         dat <- as.data.table(hot_to_r(input$hot))
+        unit <- globalSelBEC()
+        QRY <- paste0("select fid,bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
+                      " from feasorig where bgc = '",unit,"' and ",globalFeas$dat," in (1,2,3,4)")
+        datOrig <- as.data.table(dbGetQuery(con, QRY))
+        setnames(datOrig,old = globalFeas$dat, new = "feasible")
         dat <- melt(dat, id.vars = "ss_nospace", value.name = "newfeas", variable.name = "sppsplit")
-        dat[,mod := nme]
-        dbWriteTable(con, "temp_update", dat, overwrite = T)
-        dbExecute(con,"UPDATE feasorig 
+        dat2 <- datOrig[dat, on = c("ss_nospace","sppsplit")]
+        dat2[is.na(feasible),feasible := -1]
+        dat2 <- dat2[newfeas != feasible,]
+        dat2[,mod := nme]
+        datAudit <- dat2[,.(fid,ss_nospace,sppsplit,newfeas,mod)]
+        datAudit[,date := Sys.Date()]
+        dbWriteTable(con,"feas_audit", datAudit, append = T, row.names = F)
+        datNew <- dat2[is.na(bgc),]
+        datOld <- dat2[!is.na(bgc),]
+        if(nrow(datNew) > 0){
+            temp <- data.table(bgc = gsub("/.*","",datNew$ss_nospace),ss_nospace = datNew$ss_nospace,
+                               sppsplit = datNew$sppsplit,feasible = NA, 
+                               spp = substr(datNew$sppsplit,1,2),newfeas = datNew$newfeas,mod = nme)
+            dbWriteTable(con,"feasorig",temp, append = T,row.names = F)
+        }
+        if(nrow(datOld) > 0){
+            dbWriteTable(con, "temp_update", datOld, overwrite = T)
+            dbExecute(con,"UPDATE feasorig 
                   SET newfeas = temp_update.newfeas,
                   mod = temp_update.mod
                   FROM temp_update
                   WHERE feasorig.ss_nospace = temp_update.ss_nospace
                   AND feasorig.sppsplit = temp_update.sppsplit")
-        dbExecute(con,"UPDATE feasorig
+            dbExecute(con,"UPDATE feasorig
                   SET newfeas = 5
                   WHERE newfeas IS NULL
                   AND feasible IS NOT NULL")
+        }
+        
         shinyalert("Thank you!","Your updates have been recorded", type = "info",
                    imageUrl = "images/puppy1.jpg",imageHeight = "100px", inputId = "dbmessage")
 
@@ -1047,11 +1112,10 @@ server <- function(input, output, session) {
                    text = tagList(
                        h4("Select a species, add feasibility, then click submit"),
                        pickerInput("sppPickAdd",
-                                   label = "",
-                                   choices = allSppNames,
-                                   selected = "Ba"), 
-                       fluidRow(column(6,rHandsontableOutput("hot_add")),
-                                column(6,textInput("addsppMod",label = "Enter your initials:"))),
+                                   label = NULL,
+                                   choices = sppSplitList), 
+                       fluidRow(column(8,rHandsontableOutput("hot_add")),
+                                column(4,textInput("addsppMod",label = "Enter your initials:"))),
                        
                    ),
                    callbackR = addSppToDb,
@@ -1065,7 +1129,7 @@ server <- function(input, output, session) {
             dat <- as.data.table(dat)
             dat2 <- data.table(bgc = gsub("/[[:digit:]]*","", dat$ss_nospace),
                                ss_nospace = dat$ss_nospace,
-                               sppsplit = input$sppPickAdd,
+                               sppsplit = substr(input$sppPickAdd,1,2),
                                feasible = NA,spp = substr(input$sppPickAdd,1,2), newfeas = dat$newfeas, mod = input$addsppMod)
             
             dat2 <- dat2[!is.na(newfeas),]

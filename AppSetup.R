@@ -18,7 +18,6 @@ library(shinythemes)
 ##connect to database
 ###Read in climate summary data
 
-
 subzones_colours_ref <- fread("./inputs/WNA_v12_HexCols.csv")
 setnames(subzones_colours_ref,c("BGC","Col"))
 
@@ -67,13 +66,15 @@ trialInit <- data.table(
 pestCat <- fread("./inputs/Pest_Types.csv")
 ##setup species picker
 treelist <- fread("./inputs/Tree_List_2021.csv")
-treelist <- treelist[NotUse != "x",.(TreeCode,EnglishName, Group)]
+treelist <- treelist[NotUse != "x",.(Sppsplit,TreeCode,EnglishName, Group)]
 treelist[,TreeCode := paste0(TreeCode," - ", EnglishName)]
 #treelist <- rbind(treelist,data.table(TreeCode = "None",Group = "Conifer_BC"))
 sppList <- list()
+sppSplitList <- list()
 for(nm in c("Conifer_BC","Broadleaf_BC","Conifer_Native","Broadleaf_Native")){
-  temp <- treelist[Group == nm, TreeCode]
+  temp <- unique(treelist[Group == nm, TreeCode])
   sppList[[nm]] <- temp
+  sppSplitList[[nm]] <- treelist[Group == nm, Sppsplit]
 }
 allSppNames <- unlist(sppList)
 allSppNames <- substr(allSppNames,1,2)

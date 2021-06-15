@@ -219,6 +219,12 @@ jscode_fh <- paste0('window.LeafletWidget.methods.addFHTiles = function(BGC,Colo
 
       });
       
+      Shiny.addCustomMessageHandler("clearPest",function(dat){
+        prevPest.forEach((hl,i) => {
+          subzLayer.resetFeatureStyle(hl);
+        });
+      });
+      
     };')
 
 leafletjs_fh <-  tags$head(
