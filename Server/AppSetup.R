@@ -117,21 +117,73 @@ edaLeg <- list(
   title = "Edatopic Feasibility"
 )
 
-instr <- tagList(
-  p("To use this tool:"),
+instr_feas <- tagList(
+  h3("Tree Feasibility"),
+  h4("Map Options"),
   tags$ol(
     tags$li("Select a species code to view its range and feasibility rating on the map."),
-    tags$li("Select type of map: A) Presence/Absence, B) Climatic Suitability. C) Environmental suitability in select edatopic space 
-                (click again to return to summarised view)."),
-    tags$li("Click on a BGC polygon to display feasibility ratings in table format")),
+    tags$li("By default, the map shows original values. Check box to show updated values instead."),
+    tags$li("By default, the map shows summarised range by BGC, shaded by frequency."),
+    tags$li("To view feasibiliy ratings, select an edatopic location on the grid. 
+            The map shading then represents mean feasibility. Click again to return to range view"),
+    tags$li("To view actual locations of the selected species from plot data or offsite trials, select
+            the respective radio buttons.")),
   tags$hr(),
-  p("Note: The values in the table can be updated and
-                                           submitted to a database unless Climatic Suitability is selected. 
-                                           To view updated feasibility toggle the Updated Feasibility Button"),
-  p("There are several other options available:"),
+  h4("View and Update Values"),
   tags$ol(
-    tags$li("By default the tool shows only BC. Toggle WNA to see rating across western north america"),
-    tags$li("By default the tool does not show the BGC map. Shift slider to show colour-themed BGC"),
-    tags$li("Show locations of actual tree species collections/observations in the dataset")),
-  tags$hr()
+    tags$li("To view data in table form, click on a BGC"),
+    tags$li("To update values, change data in the table, click submit, and add your initials."),
+    tags$li("To add a species, click 'Add Species'; to remove a species, delete all entries in table.")
+  ),
+  p("Note: The button at the top right of the map allows you to select layers to show, and change
+    the base layer. The slider on the bottom changes BGC layer opacity (zoom in or out for changes to
+    take effect).")
+)
+
+instr_offsite <- tagList(
+  h3("Off-site Trials"),
+  h4("Map Options"),
+  tags$ol(
+    tags$li("Select one or more trial categories to display locations on the map"),
+    tags$li("There are various filters: you can show plots that contain a certain species,
+            have multiple species, or filter by date planted.")
+    ),
+  tags$hr(),
+  h4("View and Update Plots"),
+  p("There are two way to input data:"),
+  tags$ol(
+    tags$li("To add a new plot, use the form on the side panel - note you can click on the 
+            map to select a location"),
+    tags$li("To add or update an assessment on an existing trial, click on the plot (or select the
+            id from the dropdown) and update values in the assessment column of the table below the map. 
+            Don't forget to submit!")
+  ),
+  p("Note: The button at the top right of the map allows you to select layers to show, and change
+    the base layer. The slider on the bottom changes BGC layer opacity (zoom in or out for changes to
+    take effect).")
+)
+
+instr_forhealth <- tagList(
+  h3("Forest Health"),
+  h4("Map Options"),
+  p("The map shows the range of the selected host, and the hazard rating for the selected pest,
+    if it exists."),
+  tags$ol(
+    tags$li("Select a host species"),
+    tags$li("Select a pest from the dropdown (note that the dropdown only contains
+            pests which effect the selected host).")
+  ),
+  tags$hr(),
+  h4("View and Update Hazard"),
+  p("There are two way to input data:"),
+  tags$ol(
+    tags$li("Once a host and pest is specified, the side panel table shows the data rating
+           for all suitible BGCs. Update the 'hazard_update' column and submit."),
+    tags$li("To update a selected BGC, click on the map. The table below the map displays
+            a pest by host matrix which can also be updated. Greyed out cells represent non-existant
+            combinations.")
+  ),
+  p("Note: The button at the top right of the map allows you to select layers to show, and change
+    the base layer. The slider on the bottom changes BGC layer opacity (zoom in or out for changes to
+    take effect).")
 )
