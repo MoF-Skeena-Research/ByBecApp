@@ -27,6 +27,6 @@ remote_shp_tiles_kd(tileserver,
                  "-o /mapdata/cutblocks.mbtiles -z15 --simplification=10 --force --coalesce-densest-as-needed --extend-zooms-if-still-dropping --detect-shared-borders",
                  source_dir = out_dir, skip_upload = F)
 
-
 launch_tileserver_kd(tileserver,config = "./config/tileserver/config.json")
+
 
