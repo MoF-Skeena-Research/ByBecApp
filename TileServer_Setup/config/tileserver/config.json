@@ -34,11 +34,17 @@
     }
   },
   "data": {
-    "WNA_MAP": {
-      "mbtiles": "tiles.mbtiles"
-    },
-    "Districts": {
+    "Defer": {
       "mbtiles": "tiles2.mbtiles"
+    },
+    "Ancient": {
+      "mbtiles": "ancient.mbtiles"
+    },
+    "Rare": {
+      "mbtiles": "rare.mbtiles"
+    },
+    "Cutblocks": {
+      "mbtiles": "cutblocks.mbtiles"
     }
   }
 }
