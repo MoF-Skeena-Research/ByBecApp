@@ -3,13 +3,10 @@
 
 library(sf)
 library(analogsea)
-Sys.setenv(DO_PAT="eae4166ed2fac0e3c41660fe26a009bb0176ab8bceeaf753faf5189f58a06520")
+Sys.setenv(DO_PAT = "b02741f9a02e7386464b5dd7a2dbea6d890c3f8051fd32fd239e17590a0039bf")
 library(bccciss)
 source("./TS_Functions.R")
 
-out_dir <- "./data-raw/Map"
-#shp_name <- "WNA_MAP.shp"
-layer <- "Districts"
 system("rm -R ./data-raw")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -21,10 +18,15 @@ st_write(dat,dsn = out_dir,layer = layer,driver = "ESRI Shapefile")
 # Digital Ocean provisioning - Setup your SSH keys in your accounts before running these.
 #tileserver <- setup_docklet(size = "s-2vcpu-4gb-intel")
 # Or Reuse an existing droplet
-tileserver <- droplets()[["tileserver-wna"]]
+
+
+tileserver <- droplets()[["TyrannicalAccessibility"]]
 # About 5-6h
+out_dir <- "./Data/Cutblocks"
 remote_shp_tiles_kd(tileserver,
-                 "-z15 --simplification=10 --force --coalesce-densest-as-needed --extend-zooms-if-still-dropping --detect-shared-borders",
+                 "-o /mapdata/cutblocks.mbtiles -z15 --simplification=10 --force --coalesce-densest-as-needed --extend-zooms-if-still-dropping --detect-shared-borders",
                  source_dir = out_dir, skip_upload = F)
-launch_tileserver(tileserver,config = "./TileServer_Setup/config/tileserver/config.json")
+
+launch_tileserver_kd(tileserver,config = "./config/tileserver/config.json")
+
 

@@ -69,7 +69,7 @@ remote_shp_tiles_kd <- function(droplet, ..., source_dir, remote_dir = "/tmp/shp
     geojsons <- shQuote(file.path(remote_dir, paste0(names(layers), ".geojson")))
   }
   
-  base_cmd <- "tippecanoe -o /mapdata/tiles2.mbtiles"
+  base_cmd <- "tippecanoe"
   cmd <- paste(base_cmd, paste(..., collapse = " "), paste(geojsons, collapse = " "))
   analogsea::droplet_ssh(droplet, cmd)
   analogsea::droplet_ssh(droplet, "ls -alh /mapdata | grep mbtiles")
