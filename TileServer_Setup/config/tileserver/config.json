@@ -35,10 +35,13 @@
   },
   "data": {
     "WNA_MAP": {
-      "mbtiles": "tiles.mbtiles"
+      "mbtiles": "wnabgc.mbtiles"
     },
     "Districts": {
-      "mbtiles": "tiles2.mbtiles"
+      "mbtiles": "districts.mbtiles"
+    },
+    "BC_BGC": {
+      "mbtiles": "bcbgc.mbtiles"
     }
   }
 }

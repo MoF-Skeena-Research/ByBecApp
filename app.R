@@ -23,8 +23,8 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                 fluidRow(style = "background-color: #003366;",
                     column(6,img(src = "images/gov3_bc_logo.png",align = "left")),
                          column(6,h1("The By-BEC Portal",style = "color: white;"))),
-                tabsetPanel(
-                    tabPanel("Tree Feasibility",
+                tabsetPanel(id = "tabs",
+                    tabPanel(value = "tab1", title = "Tree Feasibility",
                              useShinyalert(),
                              useShinyjs(),
                              fluidPage(
@@ -75,7 +75,7 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                  )
                              )
                     ),
-                    tabPanel("Off-site Trials",
+                    tabPanel(value = "tab2", title = "Off-site Trials",
                              column(3,
                                     h2("Offsite Species Trials"),
                                     checkboxGroupInput("trials2","Show location of offsite trials",offsiteProj),
@@ -119,7 +119,7 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                     downloadButton("downloadPest")
                              )
                     ),
-                    tabPanel("Forest Health",
+                    tabPanel(value = "tab3",title = "Forest Health",
                              column(3,
                                     h2("Hazard Rating by Tree and Pest"),
                                     selectInput("fhSpp",
@@ -150,6 +150,37 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                     actionButton("submitFH","Submit Hazard Updates")
                              )
                     ),
+                    tabPanel(value = "tab4", title = "Climate Summaries",
+                             column(3,
+                                    h2("Climate variable summaries by BGC"),
+                                    pickerInput("map_period",
+                                                label = "Select Time Period",
+                                                choices = "",
+                                                multiple = F,
+                                                selected = NULL),
+                                    pickerInput("map_climvar",
+                                                "Select Climate Variables",
+                                                choices = "",
+                                                inline = FALSE,
+                                                multiple = F,
+                                                selected = NULL),
+                                    awesomeRadio("map_stat",
+                                                 "Select Display Statistic",
+                                                 choices = c("Mean","Variance"),
+                                                 inline = T,
+                                                 selected = "Mean"),
+                                    awesomeRadio("map_scn",
+                                                 "Select Emission Scenario",
+                                                 choices = "",
+                                                 inline = TRUE,
+                                                 selected = NULL)
+                                    ),
+                             column(9,
+                                    h3("Climate by BGC Map"),
+                                    leafletjs_clim,
+                                    leafletOutput("climMap", height = "70vh")
+                                    )
+                             ),
                     tabPanel("Find a BGC",
                              fluidRow(
                                  column(2,
@@ -202,14 +233,18 @@ server <- function(input, output, session) {
     globalLeg <- reactiveValues(Legend = climaticLeg)
     globalSelBEC <- reactiveVal()
     globalAddTrial <- reactiveValues(data = trialInit)
+    climsumInputs <- reactiveValues()
+    climsumCols <- reactiveValues(Data = data.table())
     
     source("Server/Server_TreeFeas.R",local = T)
     source("Server/Server_Offsite.R",local = T)
     source("Server/Server_ForHealth.R",local = T)
+    source("Server/Server_ClimSum.R",local = T)
     source("Server/Server_FindBGC.R",local = T)
     
     onStop(function() {
         dbDisconnect(conn = con)
+        dbDisconnect(conn = climcon)
     })
 }
 

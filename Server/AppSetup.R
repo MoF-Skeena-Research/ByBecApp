@@ -17,14 +17,19 @@ library(shinythemes)
 
 ##connect to database
 ###Read in climate summary data
+mbtk="pk.eyJ1Ijoid2htYWNrZW4iLCJhIjoiY2twaDVkNXU5MmJieTJybGE3cWRtY3Q4aCJ9.ISBkzSHFfrr78AVP2y2FeQ"
+mblbsty = "whmacken/ckph5q6d21q1318nz4shnyp20"
+mbsty="whmacken/ckph5e7y01fhr17qk5nhnpo10"
 
 subzones_colours_ref <- fread("./inputs/WNA_v12_HexCols.csv")
 setnames(subzones_colours_ref,c("BGC","Col"))
 
 drv <- dbDriver("PostgreSQL")
 sapply(dbListConnections(drv), dbDisconnect)
-con <- dbConnect(drv, user = "postgres", password = "Kiriliny41", host = "68.183.199.104", 
+con <- dbConnect(drv, user = "postgres", password = "postgres", host = "138.197.168.220", 
                  port = 5432, dbname = "spp_feas")
+climcon <- dbConnect(drv, user = "postgres", password = "postgres", host = "138.197.168.220", 
+                 port = 5432, dbname = "bgc_climate_data")
 
 ##data for edatopic grid
 grd1x <- seq(1.5,4.5,1)

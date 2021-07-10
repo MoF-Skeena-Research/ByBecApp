@@ -232,6 +232,82 @@ leafletjs_fh <-  tags$head(
     jscode_fh
   ))
 )
+#########################
+
+jscode_clim <- paste0('window.LeafletWidget.methods.addClimSumTiles = function() {
+      
+      var map = this;
+      
+      var vectorTileOptions=function(layerName, layerId, activ,
+                                     lfPane, prop, id) {
+        return {
+          vectorTileLayerName: layerName,
+          interactive: true, 
+          vectorTileLayerStyles: {
+            [layerId]: function(properties, zoom) {
+              return {
+                weight: 0,
+                fillColor: "#ffffff",
+                fill: true,
+                fillOpacity: 0
+              }
+            }
+          },
+          pane : lfPane,
+          getFeatureId: function(f) {
+            return f.properties[id];
+          }
+        }
+        
+      };
+      
+      var subzLayer = L.vectorGrid.protobuf(
+        "', bgc_tileserver, '",
+        vectorTileOptions("bec_fh", "', bgc_tilelayer, '", true,
+                          "tilePane", "MAP_LABEL", "MAP_LABEL")
+      )
+      this.layerManager.addLayer(subzLayer, "tile", "bec_clim", "Climate");
+      Shiny.setInputValue("clim_click",null);
+
+      subzLayer.on("click", function(e){
+        Shiny.setInputValue("clim_click",e.layer.properties.MAP_LABEL);
+      });
+
+      subzLayer.bindTooltip(function(e) {
+        return e.properties.MAP_LABEL;
+      }, {sticky: true, textsize: "10px", opacity: 1});
+      subzLayer.bringToFront();
+      
+      //update style for climate
+      Shiny.addCustomMessageHandler("colourClimate",function(climDat){
+        var climBGC = climDat["bgc"];
+        var climCols = climDat["col"];
+
+        climBGC.forEach((ID,i) => {
+          let styleFH = {
+            weight: 0,
+            fillColor: climCols[i],
+            fillOpacity: 1,
+            fill: true
+          };
+          subzLayer.setFeatureStyle(ID, styleFH);
+        });
+
+      });
+      
+    };')
+
+leafletjs_clim <-  tags$head(
+  tags$script(HTML(
+    jscode_clim
+  ))
+)
+
+addPlugins <- function(map) {
+  map <- registerPlugin(map, plugins$vgplugin)
+  map <- registerPlugin(map, plugins$sliderplugin)
+  map
+}
 
 addBGCTiles <- function(map) {
   map <- registerPlugin(map, plugins$vgplugin)
