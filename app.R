@@ -20,6 +20,7 @@ source("Server/AppSetup.R") ##load a prepare data
 source("Server/FeasAppSource.R") ##javascript functions
 # Define UI for application that draws a histogram
 ui <- fluidPage(theme = shinytheme("lumen"),
+                tags$head(HTML("<title>BEC is God</title>")),
                 fluidRow(style = "background-color: #003366;",
                     column(6,img(src = "images/gov3_bc_logo.png",align = "left")),
                          column(6,h1("The By-BEC Portal",style = "color: white;"))),
@@ -251,6 +252,7 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                                 column(10,
                                                        titlePanel("Summary Figures"),
                                                        h4("ClimateBC Summary by BGC"),
+                                                       actionButton("showdata","Show Data"),
                                                        #downloadButton("downloadSumPlots",label = "Download Plots"),
                                                        plotOutput("sumPlots")
                                                 )

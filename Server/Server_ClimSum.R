@@ -178,7 +178,7 @@ observeEvent(input$clim_click,{
              ))
 })
 
-### graph interface
+###################################### graph interface ##################################################
 ##update interface options
 observeEvent(input$byZone,{
   toggleElement(id = "sz.choose",condition = input$byZone != "Zone")
@@ -256,6 +256,28 @@ getData_Plots <- reactive({
     
     return(climSubset)
   }
+})
+
+### create data table download
+output$summaryTable <- renderTable({
+  dat <- getData_Plots()
+  dat
+},bordered = T)
+
+###Download data
+output$downloadTable <- downloadHandler(
+  filename = "ClimateSummary.csv",
+  content = function(file){
+    fwrite(getData_Plots(), file)
+  }
+)
+
+observeEvent(input$showdata,{
+  showModal(modalDialog(
+               h3("Climate Data"),
+               downloadButton("downloadTable","Download Data"),
+               tableOutput("summaryTable")
+             ))
 })
 
 ###create main summary plots
