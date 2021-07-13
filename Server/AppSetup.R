@@ -14,6 +14,7 @@ library(leafgl)
 library(leaflet)
 library(colourvalues)
 library(shinythemes)
+library(gridExtra)
 
 ##connect to database
 ###Read in climate summary data
@@ -93,6 +94,7 @@ offsiteProj <- dbGetQuery(con,"select distinct project_id from offsite")[,1]
 ##max suitability colours
 ##BGC colours
 zones <- fread("inputs/BGCZones.csv")
+zonesBC <- zones[Region == "BC",Zone]
 zones <- zones$Zone
 subzones <- unique(subzones_colours_ref$BGC)
 
@@ -191,4 +193,20 @@ instr_forhealth <- tagList(
   p("Note: The button at the top right of the map allows you to select layers to show, and change
     the base layer. The slider on the bottom changes BGC layer opacity (zoom in or out for changes to
     take effect).")
+)
+
+instr_climmap <- tagList(
+  h3("Climate Summaries - Map Interface"),
+  h4("Map Options"),
+  p("The map themes BGCs by their mean or variance for the selected climate variable;
+    low values are green, high values are red. Hovering over a BGC shows the BGC name 
+    and climatic value; clicking on a BGC shows a boxplot of all time periods for that unit."),
+  tags$ol(
+    tags$li("Select a time period"),
+    tags$li("Select a climate variable"),
+    tags$li("Select statistic (mean or variance)"),
+    tags$li("Select emmision scenario (only applicable to future periods)")
+  ),
+  p("Note: The button at the top right of the map allows you to select layers to show, and change
+    the base layer.")
 )

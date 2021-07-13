@@ -273,15 +273,23 @@ jscode_clim <- paste0('window.LeafletWidget.methods.addClimSumTiles = function()
         Shiny.setInputValue("clim_click",e.layer.properties.MAP_LABEL);
       });
 
-      subzLayer.bindTooltip(function(e) {
-        return e.properties.MAP_LABEL;
-      }, {sticky: true, textsize: "10px", opacity: 1});
+      
       subzLayer.bringToFront();
       
       //update style for climate
       Shiny.addCustomMessageHandler("colourClimate",function(climDat){
         var climBGC = climDat["bgc"];
         var climCols = climDat["col"];
+        var climLabs = climDat["lab"];
+        var tooltipLabs = {};
+        
+        climBGC.forEach((bec,i) => {
+          const label = climLabs[i];
+          tooltipLabs[bec] = label;
+        });
+        subzLayer.bindTooltip(function(e) {
+          return tooltipLabs[e.properties.MAP_LABEL];
+        }, {sticky: true, textsize: "10px", opacity: 1});
 
         climBGC.forEach((ID,i) => {
           let styleFH = {
