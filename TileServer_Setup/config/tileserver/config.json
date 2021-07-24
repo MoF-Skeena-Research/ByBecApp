@@ -34,32 +34,14 @@
     }
   },
   "data": {
-    "Ancient": {
-      "mbtiles": "ancient.mbtiles"
+    "WNA_MAP": {
+      "mbtiles": "wnabgc.mbtiles"
     },
-    "Cutblocks": {
-      "mbtiles": "cutblocks.mbtiles"
+    "Districts": {
+      "mbtiles": "districts.mbtiles"
     },
-    "Rare": {
-      "mbtiles": "rare.mbtiles"
-    },
-    "Defer": {
-      "mbtiles": "tiles2.mbtiles"
-    },
-    "Seral": {
-      "mbtiles": "seral.mbtiles"
-    },
-    "cSI": {
-      "mbtiles": "cSI.mbtiles"
-    },
-    "Disturb": {
-      "mbtiles": "Disturb.mbtiles"
-    },
-    "Protected": {
-      "mbtiles": "Protected.mbtiles"
-    },
-    "TreeHt": {
-      "mbtiles": "TreeHt.mbtiles"
+    "BC_BGC": {
+      "mbtiles": "bcbgc.mbtiles"
     }
   }
 }

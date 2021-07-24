@@ -20,11 +20,12 @@ source("Server/AppSetup.R") ##load a prepare data
 source("Server/FeasAppSource.R") ##javascript functions
 # Define UI for application that draws a histogram
 ui <- fluidPage(theme = shinytheme("lumen"),
+                tags$head(HTML("<title>BEC is God</title>")),
                 fluidRow(style = "background-color: #003366;",
                     column(6,img(src = "images/gov3_bc_logo.png",align = "left")),
                          column(6,h1("The By-BEC Portal",style = "color: white;"))),
-                tabsetPanel(
-                    tabPanel("Tree Feasibility",
+                tabsetPanel(id = "tabs",
+                    tabPanel(value = "tab1", title = "Tree Feasibility",
                              useShinyalert(),
                              useShinyjs(),
                              fluidPage(
@@ -75,7 +76,7 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                  )
                              )
                     ),
-                    tabPanel("Off-site Trials",
+                    tabPanel(value = "tab2", title = "Off-site Trials",
                              column(3,
                                     h2("Offsite Species Trials"),
                                     checkboxGroupInput("trials2","Show location of offsite trials",offsiteProj),
@@ -119,7 +120,7 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                     downloadButton("downloadPest")
                              )
                     ),
-                    tabPanel("Forest Health",
+                    tabPanel(value = "tab3",title = "Forest Health",
                              column(3,
                                     h2("Hazard Rating by Tree and Pest"),
                                     selectInput("fhSpp",
@@ -150,6 +151,114 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                     actionButton("submitFH","Submit Hazard Updates")
                              )
                     ),
+                    navbarMenu("Climate Summaries",
+                               tabPanel(value = "tab4", title = "Map Interface",
+                                        column(3,
+                                               h2("Climate variable summaries by BGC"),
+                                               pickerInput("map_period",
+                                                           label = "Select Time Period",
+                                                           choices = "",
+                                                           multiple = F,
+                                                           selected = NULL),
+                                               pickerInput("map_climvar",
+                                                           "Select Climate Variables",
+                                                           choices = "",
+                                                           inline = FALSE,
+                                                           multiple = F,
+                                                           selected = NULL),
+                                               awesomeRadio("map_stat",
+                                                            "Select Display Statistic",
+                                                            choices = c("Mean","Variance"),
+                                                            inline = T,
+                                                            selected = "Mean"),
+                                               awesomeRadio("map_scn",
+                                                            "Select Emission Scenario",
+                                                            choices = "",
+                                                            inline = TRUE,
+                                                            selected = NULL)
+                                        ),
+                                        column(9,
+                                               h3("Climate by BGC Map"),
+                                               actionButton("showinstr_climmap","Click To Show Instructions"),
+                                               leafletjs_clim,
+                                               leafletOutput("climMap", height = "70vh")
+                                        )
+                               ),
+                               tabPanel(value = "tab5", title = "Plot Interface",
+                                            fluidRow(
+                                                column(2,
+                                                       titlePanel("Select Input"), 
+                                                       awesomeRadio("includeWNA",
+                                                                    "Include WNA units?",
+                                                                    choices = c("No", "Yes"),
+                                                                    selected = "No",
+                                                                    inline = TRUE),
+                                                       
+                                                       awesomeRadio("byZone",
+                                                                    "Summarize by:",
+                                                                    choices = c("Zone","Subzone/variant"),
+                                                                    selected = "Subzone/variant",
+                                                                    inline = TRUE),
+                                                       pickerInput(inputId = "BGCZone.choose",###Select BGCs
+                                                                   label = "Select Zones for Summary",
+                                                                   choices = "", 
+                                                                   multiple = TRUE),
+                                                       hidden(pickerInput("sz.choose",
+                                                                          label = "Select Subzones",
+                                                                          choices = "",
+                                                                          multiple = TRUE,
+                                                                          options = list(`actions-box` = TRUE))),
+                                                       dropdown(
+                                                           pickerInput("periodTS",
+                                                                       label = "Sequential Normal Periods",
+                                                                       choices = "",
+                                                                       multiple = TRUE,
+                                                                       options = list(`actions-box` = TRUE)),
+                                                           pickerInput("periodOther",
+                                                                       label = "Other Normal Periods",
+                                                                       choices = "",
+                                                                       multiple = TRUE,
+                                                                       options = list(`actions-box` = TRUE)),
+                                                           circle = FALSE, label = "Period", status = "primary"), 
+                                                       
+                                                           pickerInput("graph_climvar",
+                                                                       "Select Climate Variables:",
+                                                                       choices = "",
+                                                                       inline = FALSE,
+                                                                       multiple = TRUE),
+
+                                                       ####Select choices for graphs
+                                                       awesomeRadio("Error",
+                                                                    "Select Error Type:",
+                                                                    choices = c("st.dev.Geo","st.dev.Ann"),
+                                                                    selected = "st.dev.Geo",
+                                                                    inline = TRUE),
+                                                       awesomeRadio("Scenario",
+                                                                    "Select Future Scenario",
+                                                                    choices = c("ssp126","ssp245","ssp370","ssp585"),
+                                                                    selected = "ssp370",
+                                                                    inline = TRUE),
+                                                       awesomeRadio("futError",
+                                                                    "Select Future Error Type",
+                                                                    choices = c("SD.Mod","SD.Geo"),
+                                                                    selected = "SD.Geo",
+                                                                    inline = TRUE),
+                                                       awesomeRadio("grType",
+                                                                    "Choose Graph Type",
+                                                                    choices = c("Bar","Boxplot","Line"),
+                                                                    selected = "Bar",
+                                                                    inline = TRUE)
+                                                ),
+                                                column(10,
+                                                       titlePanel("Summary Figures"),
+                                                       h4("ClimateBC Summary by BGC"),
+                                                       actionButton("showdata","Show Data"),
+                                                       #downloadButton("downloadSumPlots",label = "Download Plots"),
+                                                       plotOutput("sumPlots")
+                                                )
+                                       )
+                               )
+                        ),
                     tabPanel("Find a BGC",
                              fluidRow(
                                  column(2,
@@ -191,10 +300,8 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                    p("Please submit issues or PRs to our", a("Github repo",href = "https://github.com/FLNRO-Smithers-Research/ByBecApp"))
                                    )
                              )
-                )
-                 
-                          
-                 )
+         )
+)
 
 server <- function(input, output, session) {
     globalFeas <- reactiveValues(dat = "feasible")
@@ -202,14 +309,19 @@ server <- function(input, output, session) {
     globalLeg <- reactiveValues(Legend = climaticLeg)
     globalSelBEC <- reactiveVal()
     globalAddTrial <- reactiveValues(data = trialInit)
+    climsumInputs <- reactiveValues()
+    climsumCols <- reactiveValues(Data = data.table())
+    climsumExtreme <- reactiveValues()
     
     source("Server/Server_TreeFeas.R",local = T)
     source("Server/Server_Offsite.R",local = T)
     source("Server/Server_ForHealth.R",local = T)
+    source("Server/Server_ClimSum.R",local = T)
     source("Server/Server_FindBGC.R",local = T)
     
     onStop(function() {
         dbDisconnect(conn = con)
+        dbDisconnect(conn = climcon)
     })
 }
 
