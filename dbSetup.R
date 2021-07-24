@@ -28,7 +28,7 @@ feas[,newfeas := feasible]
 feas[,mod := NA_character_]
 feas <- feas[sppsplit != "X",]
 
-eda <- fread("~/CommonTables/Edatopic_v12_3.csv")
+eda <- fread("./Edatopic_v12_5.csv")
 eda <- eda[is.na(Special) | Special == "",.(BGC,SS_NoSpace,Edatopic)]
 eda[,SMR := as.numeric(gsub("[[:alpha:]]","", Edatopic))]
 feas <- feas[ss_nospace %chin% eda$SS_NoSpace,]

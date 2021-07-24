@@ -9,12 +9,14 @@ source("./TS_Functions.R")
 
 system("rm -R ./data-raw")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+out_dir <- "./data-raw"
 
-dat <- st_read("./OrigData/Forest_Region_District2.gpkg")
-dat <- dat[,c("DISTRICT_N","ORG_UNIT","REGION_ORG","REGION_O_1")]
-colnames(dat)[1:4] <- c("dist_name","dist_code","reg_code","reg_name")
+dat <- st_read("../../OldGrowthApp/Seral34.gpkg")
+dat$PolyID <- seq_along(dat$Seral)
+# dat <- dat[,c("DISTRICT_N","ORG_UNIT","REGION_ORG","REGION_O_1")]
+# colnames(dat)[1:4] <- c("dist_name","dist_code","reg_code","reg_name")
 dat <- st_transform(dat,4326)
-st_write(dat,dsn = out_dir,layer = layer,driver = "ESRI Shapefile")
+st_write(dat,dsn = out_dir,layer = "Seral",driver = "ESRI Shapefile")
 # Digital Ocean provisioning - Setup your SSH keys in your accounts before running these.
 #tileserver <- setup_docklet(size = "s-2vcpu-4gb-intel")
 # Or Reuse an existing droplet
@@ -22,9 +24,9 @@ st_write(dat,dsn = out_dir,layer = layer,driver = "ESRI Shapefile")
 
 tileserver <- droplets()[["TyrannicalAccessibility"]]
 # About 5-6h
-out_dir <- "./Data/Cutblocks"
+#out_dir <- "./Data/Cutblocks"
 remote_shp_tiles_kd(tileserver,
-                 "-o /mapdata/cutblocks.mbtiles -z15 --simplification=10 --force --coalesce-densest-as-needed --extend-zooms-if-still-dropping --detect-shared-borders",
+                 "-o /mapdata/seral.mbtiles -Z8 -z15 --simplification=10 --force --coalesce-densest-as-needed --extend-zooms-if-still-dropping --detect-shared-borders",
                  source_dir = out_dir, skip_upload = F)
 
 launch_tileserver_kd(tileserver,config = "./config/tileserver/config.json")

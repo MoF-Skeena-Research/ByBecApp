@@ -22,29 +22,44 @@
       "serve_rendered": false,
       "tilejson": {
         "type": "overlay",
-        "bounds": [-139.06131, 30.29681, -109.05415, 60.00478]
+        "bounds": [-139.06131, 48.29681, -114.05415, 60.00478]
       }
     },
     "rendered": {
       "serve_rendered": true,
       "tilejson": {
         "type": "overlay",
-        "bounds": [-139.06131, 30.29681, -109.05415, 60.00478]
+        "bounds": [-139.06131, 48.29681, -114.05415, 60.00478]
       }
     }
   },
   "data": {
-    "Defer": {
-      "mbtiles": "tiles2.mbtiles"
-    },
     "Ancient": {
       "mbtiles": "ancient.mbtiles"
+    },
+    "Cutblocks": {
+      "mbtiles": "cutblocks.mbtiles"
     },
     "Rare": {
       "mbtiles": "rare.mbtiles"
     },
-    "Cutblocks": {
-      "mbtiles": "cutblocks.mbtiles"
+    "Defer": {
+      "mbtiles": "tiles2.mbtiles"
+    },
+    "Seral": {
+      "mbtiles": "seral.mbtiles"
+    },
+    "cSI": {
+      "mbtiles": "cSI.mbtiles"
+    },
+    "Disturb": {
+      "mbtiles": "Disturb.mbtiles"
+    },
+    "Protected": {
+      "mbtiles": "Protected.mbtiles"
+    },
+    "TreeHt": {
+      "mbtiles": "TreeHt.mbtiles"
     }
   }
 }
