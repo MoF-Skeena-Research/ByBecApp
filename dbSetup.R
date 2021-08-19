@@ -3,7 +3,7 @@ library(data.table)
 library(sf)
 
 drv <- dbDriver("PostgreSQL")
-con <- dbConnect(drv, user = "postgres", password = "Kiriliny41", host = "68.183.199.104", 
+con <- dbConnect(drv, user = "postgres", password = "postgres", host = "138.197.168.220", 
                  port = 5432, dbname = "spp_feas")
 
 dbSafeNames = function(names) {
@@ -13,7 +13,7 @@ dbSafeNames = function(names) {
   names
 }
 
-feas <- fread("~/CommonTables/Feasibility_v12_3.csv")
+feas <- fread("~/CommonTables/Feasibility_v12_8.csv")
 feas <- feas[,.(BGC,SS_NoSpace,SppVar,Feasible)]
 setnames(feas, old = "SppVar",new = "SppSplit")
 feas[,Spp := SppSplit]
@@ -27,9 +27,10 @@ setnames(feas,c("bgc","ss_nospace","sppsplit","feasible","spp"))
 feas[,newfeas := feasible]
 feas[,mod := NA_character_]
 feas <- feas[sppsplit != "X",]
+feas[,fid := seq_along(feas$bgc)]
 
-eda <- fread("~/CommonTables/Edatopic_v12_3.csv")
-eda <- eda[is.na(Special) | Special == "",.(BGC,SS_NoSpace,Edatopic)]
+eda <- fread("~/CommonTables/Edatopic_v12_6.csv")
+#eda <- eda[is.na(Special) | Special == "",.(BGC,SS_NoSpace,Edatopic)]
 eda[,SMR := as.numeric(gsub("[[:alpha:]]","", Edatopic))]
 feas <- feas[ss_nospace %chin% eda$SS_NoSpace,]
 setnames(eda,dbSafeNames(colnames(eda)))
