@@ -31,6 +31,7 @@ feas[,fid := seq_along(feas$bgc)]
 
 eda <- fread("~/CommonTables/Edatopic_v12_6.csv")
 #eda <- eda[is.na(Special) | Special == "",.(BGC,SS_NoSpace,Edatopic)]
+
 eda[,SMR := as.numeric(gsub("[[:alpha:]]","", Edatopic))]
 feas <- feas[ss_nospace %chin% eda$SS_NoSpace,]
 setnames(eda,dbSafeNames(colnames(eda)))
