@@ -6,6 +6,37 @@ drv <- dbDriver("PostgreSQL")
 con <- dbConnect(drv, user = "postgres", password = "postgres", host = "138.197.168.220", 
                  port = 5432, dbname = "spp_feas")
 
+##update forest health
+fh <- dbGetQuery(con,"select * from forhealth")
+feas <- dbGetQuery(con,"select * from feasorig")
+fhUnits <- unique(fh$bgc)
+allUnits <- unique(feas$bgc)
+
+sppFeas <- feas[newfeas < 4,.(minfeas = min(newfeas)),by = .(bgc,spp)]
+
+fh <- setDT(fh)
+setkey(fh,bgc,treecode,pest)
+feas <- setDT(feas)
+setkey(feas,bgc,spp)
+setkey(sppFeas,bgc,spp)
+t1 <- fh[sppFeas]
+#currPest <- t1[!is.na(pest),]
+#currPest[,minfeas := NULL]
+toAdd <- unique(t1[,.(bgc,treecode)])
+sppPest <- unique(fh[,.(treecode,pest,pest_name)])
+toAdd <- sppPest[toAdd, on = "treecode",allow.cartesian = T]
+setkey(toAdd, bgc,treecode,pest)
+newfh <- fh[toAdd]
+newfh <- newfh[!is.na(pest),]
+newfh[,pest_name := NULL]
+setnames(newfh,old = "i.pest_name", new = "pest_name")
+setcolorder(newfh,names(fh))
+newfh[is.na(hazard),hazard := "UN"]
+newfh[is.na(hazard_update),hazard_update := "UN"]
+newfh <- unique(newfh)
+dbExecute(con,"drop table forhealth")
+dbWriteTable(con,"forhealth",newfh,row.names = F)
+#########################
 dbSafeNames = function(names) {
   names = gsub('[^a-z0-9]+','_',tolower(names))
   names = make.names(names, unique=TRUE, allow_=TRUE)
