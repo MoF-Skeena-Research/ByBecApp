@@ -1,0 +1,53 @@
+pest,pest_code
+stem rust,DSC
+stem rust,DSS
+stem rust,DSG
+foliar disease,DFS
+dwarf mistletoe,DMP
+dwarf mistletoe,DMH
+root disease,DRL
+root disease,DRT
+root disease,DRB
+root disease,DRR
+terminal weevil,IWP
+terminal weevil,IWS
+defoliating insect,IDW
+defoliating insect,IDL
+terminal weevil,IWW
+stem canker,DSA
+defoliating insect,IDA
+dwarf mistletoe,DMF
+dwarf mistletoe,DML
+root disease,DRN
+root disease,DRA
+foliage disease,DFU
+animal,AD
+foliage disease,DFW
+root disease,DRC
+stem rust & canker,DSB
+bark beetle,IBB
+bark beetle,IBD
+bark beetle,IBM
+bark beetle,IBS
+bark beetle,IBW
+defoliating insect,IDC
+defoliating insect,IDE
+defoliating insect,IDG
+defoliating insect,IDH
+defoliating insect,IDT
+defoliating insect,IDZ
+weevil,IWC
+abiotic,NCF
+abiotic,NCY
+abiotic,ND
+abiotic,NY
+leader of branch dieback,DLV
+defoliating insect,ID9
+defoliating insect,IDF
+defoliating insect,IDK
+defoliating insect,IDR
+defoliating insect,IDX
+shoot insect,ISC
+shoot insect,ISW
+abiotic,NCA
+abiotic,NCB

@@ -1,12 +1,13 @@
-PESTGROUP,PEST_SPECIES_CODE,PEST_SPECIES_COMMON_NAME,Ac,At,Dr,Ep,Mb
-ANIMAL,AD,Deer,1,1,,,1
-DISEASE,DLV,Aspen-Poplar Twig Blight,1,1,,,
-INSECT,ID9,Birch Leaf Skeletonizer,,,,1,
-INSECT,IDF,Forest Tent Caterpillar,2,1,2,2,
-INSECT,IDK,Northern Tent Caterpillar,1,1,1,1,
-INSECT,IDR,Alder Sawfly,,,1,2,
-INSECT,IDX,Large Aspen Tortrix,,1,,,
-INSECT,ISC,Poplar Borer,1,,,,
-INSECT,ISW,Poplar and Willow Borer,1,,,,
-ABIOTIC,NCA,Aspen Decline,,1,,,
-ABIOTIC,NCB,Birch Decline,,,,1,
+Use,Potential Impacts,DamageGroup,LifeStageofImpact,ClimateChangeMobility,PESTGROUP,PEST_TYPE,PEST_SPECIES_CODE,PEST_SPECIES_COMMON_NAME,PEST_SPECIES_LATIN_NAME,Ac,At,Dr,Ep,Mb
+y,moderate,killer + reducer,mature,,DISEASE,STEM DECAY,DDT,Aspen Trunk Rot,Phellinus tremulae,,,,,
+y,moderate,reducer,all,high,DISEASE,FOLIAGE DISEASE,DFK,Septoria Leaf Spot,Septoria populicola,1,1,,,
+y,moderate,reducer,all,high,DISEASE,FOLIAGE DISEASE,DFV,Leaf rust,Melampsora  spp.,1,1,,,1
+y,moderate,killer + reducer,all,high,INSECT,DEFOLIATING INSECT,ID2,Bruce Spanworm,Operophtera bruceata,1,1,,1,
+y,high,reducer,all,high,INSECT,DEFOLIATING INSECT,ID6,Aspen Leaf Miner,Phyllocristis populiella,1,1,,,1
+y,high,reducer,all,high,INSECT,DEFOLIATING INSECT,IDF,Forest Tent Caterpillar,Malacosoma disstria,1,1,,,
+y,moderate,reducer,all,high,INSECT,DEFOLIATING INSECT,IDX,Large Aspen Tortrix,Choristoneura conflictana,,,,,
+y,minor,,,,INSECT,SHOOT INSECT,ISC,Poplar Borer,Saperda calcarata,,,,,
+y,moderate,killer + reducer,mid + mature,high,INSECT,SHOOT INSECT,ISW,Poplar and Willow Borer,Cryptorhynchus lapathi,,,,,
+y,,,,,ABIOTIC,,NCA,Aspen Decline,,,,,,
+y,,,,,ABIOTIC,,NCB,Birch Decline,,1,1,,1,
+y,,,,,ANIMAL,,AD,Deer,Odocoileus spp.,,,,1,

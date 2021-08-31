@@ -1,0 +1,12 @@
+PESTGROUP,PEST_SPECIES_CODE,PEST_SPECIES_COMMON_NAME,Ac,At,Dr,Ep,Mb
+ANIMAL,AD,Deer,1,1,,,1
+DISEASE,DLV,Aspen-Poplar Twig Blight,1,1,,,
+INSECT,ID9,Birch Leaf Skeletonizer,,,,1,
+INSECT,IDF,Forest Tent Caterpillar,2,1,2,2,
+INSECT,IDK,Northern Tent Caterpillar,1,1,1,1,
+INSECT,IDR,Alder Sawfly,,,1,2,
+INSECT,IDX,Large Aspen Tortrix,,1,,,
+INSECT,ISC,Poplar Borer,1,,,,
+INSECT,ISW,Poplar and Willow Borer,1,,,,
+ABIOTIC,NCA,Aspen Decline,,1,,,
+ABIOTIC,NCB,Birch Decline,,,,1,
