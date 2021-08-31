@@ -27,9 +27,9 @@ setnames(subzones_colours_ref,c("BGC","Col"))
 
 drv <- dbDriver("PostgreSQL")
 sapply(dbListConnections(drv), dbDisconnect)
-con <- dbConnect(drv, user = "postgres", password = "postgres", host = "138.197.168.220", 
+con <- dbConnect(drv, user = "postgres", password = "PowerOfBEC", host = "138.197.168.220", 
                  port = 5432, dbname = "spp_feas")
-climcon <- dbConnect(drv, user = "postgres", password = "postgres", host = "138.197.168.220", 
+climcon <- dbConnect(drv, user = "postgres", password = "PowerOfBEC", host = "138.197.168.220", 
                  port = 5432, dbname = "bgc_climate_data")
 
 ##data for edatopic grid
