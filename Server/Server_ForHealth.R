@@ -6,7 +6,7 @@ observeEvent(input$showinstr_forhealth,{
 
 observeEvent(input$fhSpp,{
   treeSpp <- substr(input$fhSpp,1,2)
-  dat <- dbGetQuery(con,paste0("select distinct pest,pest_name from forhealth where treecode like '",treeSpp,"'"))
+  dat <- dbGetQuery(sppDb,paste0("select distinct pest,pest_name from forhealth where treecode like '",treeSpp,"'"))
   if(nrow(dat) == 0){
     updateSelectInput(session, "pestSpp", choices = "")
   }else{
@@ -56,7 +56,7 @@ output$fhMap <- renderLeaflet({
 prepDatFH <- reactive({
   QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,feasible from feasorig where spp = '",
                 substr(input$fhSpp,1,2),"' and feasible in (1,2,3,4,5)")
-  d1 <- dbGetQuery(con, QRY)
+  d1 <- dbGetQuery(sppDb, QRY)
   if(nrow(d1) != 0){
     feas <- as.data.table(d1)
     feasMax <- feas[,.(SuitMax = min(feasible)), by = .(bgc,spp)]
@@ -70,7 +70,7 @@ prepDatFH <- reactive({
 })
 
 observeEvent({c(input$pestSpp,input$submitFH,input$submitFHLong)},{
-  dat <- dbGetQuery(con,paste0("select bgc,hazard_update from forhealth where treecode like '",
+  dat <- dbGetQuery(sppDb,paste0("select bgc,hazard_update from forhealth where treecode like '",
                                substr(input$fhSpp,1,2),"' and pest = '",input$pestSpp,
                                "' and hazard_update <> 'UN'"))
   dat <- as.data.table(dat)
@@ -115,7 +115,7 @@ observeEvent(input$fh_click,{
 })
 
 observeEvent({c(input$fh_click,input$fhSpp,input$pestSpp,input$submitFHLong)},{
-  dat1 <- dbGetQuery(con,paste0("select treecode, pest, pest_name, bgc, hazard, hazard_update 
+  dat1 <- dbGetQuery(sppDb,paste0("select treecode, pest, pest_name, bgc, hazard, hazard_update 
                                           from forhealth where bgc = '",input$fh_click,"'"))
   dat <- as.data.table(dat1)
   if(nrow(dat) < 1){
@@ -162,7 +162,7 @@ observeEvent({c(input$fh_click,input$fhSpp,input$pestSpp,input$submitFHLong)},{
 
 observeEvent({c(input$pestSpp,
                 input$fhSpp)},{
-                  dat <- dbGetQuery(con,paste0("select distinct bgc, hazard, hazard_update from forhealth where treecode = '",
+                  dat <- dbGetQuery(sppDb,paste0("select distinct bgc, hazard, hazard_update from forhealth where treecode = '",
                                                substr(input$fhSpp,1,2),"' and pest = '",input$pestSpp,"'"))
                   if(nrow(dat) > 0){
                     output$fh_hot_long <- renderRHandsontable({
@@ -180,16 +180,16 @@ observeEvent(input$submitFH,{
   dat[,mod := input$fhMod]
   dat[,bgc := input$fh_click]
   if(nrow(dat) > 0){
-    currPests <- dbGetQuery(con,"select distinct pest from forhealth")[,1]
+    currPests <- dbGetQuery(sppDb,"select distinct pest from forhealth")[,1]
     if(any(!dat$pest %in% currPests)){
       d2 <- dat[!pest %chin% currPests,]
       d2[,hazard := NA]
       d2 <- d2[!is.na(hazard_update),]
-      dbWriteTable(con,"forhealth",d2, append = T, row.names = F)
+      dbWriteTable(sppDb,"forhealth",d2, append = T, row.names = F)
       dat <- dat[pest %chin% currPests,]
     }
-    dbWriteTable(con, "temp_fh", dat, overwrite = T,row.names = F)
-    dbExecute(con,"UPDATE forhealth
+    dbWriteTable(sppDb, "temp_fh", dat, overwrite = T,row.names = F)
+    dbExecute(sppDb,"UPDATE forhealth
                   SET hazard_update = temp_fh.hazard_update,
                   mod = temp_fh.mod
                   FROM temp_fh
@@ -206,8 +206,8 @@ observeEvent(input$submitFHLong,{
   dat[,`:=`(mod = input$fhModLong,treecode = substr(input$fhSpp,1,2),
             pest = input$pestSpp)]
   if(nrow(dat) > 0){
-    dbWriteTable(con, "temp_fh", dat, overwrite = T,row.names = F)
-    dbExecute(con,"UPDATE forhealth
+    dbWriteTable(sppDb, "temp_fh", dat, overwrite = T,row.names = F)
+    dbExecute(sppDb,"UPDATE forhealth
                   SET hazard_update = temp_fh.hazard_update,
                   mod = temp_fh.mod
                   FROM temp_fh
