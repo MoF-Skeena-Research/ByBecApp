@@ -69,10 +69,20 @@ prepDatFH <- reactive({
   
 })
 
-observeEvent({c(input$pestSpp,input$submitFH,input$submitFHLong)},{
-  dat <- dbGetQuery(con,paste0("select bgc,hazard_update from forhealth where treecode like '",
-                               substr(input$fhSpp,1,2),"' and pest = '",input$pestSpp,
-                               "' and hazard_update <> 'UN'"))
+observeEvent({c(input$pestSpp,input$submitFH,input$submitFHLong,input$fh_region)},{
+  if(input$fh_region == "BC"){
+    print("Getting BC")
+    q1 <- paste0("select bgc,hazard_update from forhealth where treecode like '",
+                 substr(input$fhSpp,1,2),"' and pest = '",input$pestSpp,
+                 "' and hazard_update <> 'UN' and region = 'BC'")
+    dat <- dbGetQuery(con,q1)
+  }else{
+    print("getting WNA")
+    q1 <- paste0("select bgc,hazard_update from forhealth where treecode like '",
+                 substr(input$fhSpp,1,2),"' and pest = '",input$pestSpp,
+                 "' and hazard_update <> 'UN'")
+    dat <- dbGetQuery(con,q1)
+  }
   dat <- as.data.table(dat)
   #browser()
   if(nrow(dat) > 0){
@@ -114,9 +124,15 @@ observeEvent(input$fh_click,{
   })
 })
 
-observeEvent({c(input$fh_click,input$fhSpp,input$pestSpp,input$submitFHLong)},{
-  dat1 <- dbGetQuery(con,paste0("select treecode, pest, pest_name, bgc, hazard, hazard_update 
-                                          from forhealth where bgc = '",input$fh_click,"'"))
+observeEvent({c(input$fh_click,input$fhSpp,input$pestSpp,input$submitFHLong,input$fh_region)},{
+  if(input$fh_region == "BC"){
+    q1 <- paste0("select treecode, pest, pest_name, bgc, hazard, hazard_update 
+                                          from forhealth where bgc = '",input$fh_click,"' and region = 'BC'")
+  }else{
+    q1 <- paste0("select treecode, pest, pest_name, bgc, hazard, hazard_update 
+                                          from forhealth where bgc = '",input$fh_click,"'")
+  }
+  dat1 <- dbGetQuery(con,q1)
   dat <- as.data.table(dat1)
   if(nrow(dat) < 1){
     dat <- data.table()
@@ -161,9 +177,16 @@ observeEvent({c(input$fh_click,input$fhSpp,input$pestSpp,input$submitFHLong)},{
 })
 
 observeEvent({c(input$pestSpp,
-                input$fhSpp)},{
-                  dat <- dbGetQuery(con,paste0("select distinct bgc, hazard, hazard_update from forhealth where treecode = '",
-                                               substr(input$fhSpp,1,2),"' and pest = '",input$pestSpp,"'"))
+                input$fhSpp,
+                input$fh_region)},{
+                  if(input$fh_region == "BC"){
+                    q1 <- paste0("select distinct bgc, hazard, hazard_update from forhealth where treecode = '",
+                                 substr(input$fhSpp,1,2),"' and pest = '",input$pestSpp,"' and region = 'BC'")
+                  }else{
+                    q1 <- paste0("select distinct bgc, hazard, hazard_update from forhealth where treecode = '",
+                                 substr(input$fhSpp,1,2),"' and pest = '",input$pestSpp,"'")
+                  }
+                  dat <- dbGetQuery(con,q1)
                   if(nrow(dat) > 0){
                     output$fh_hot_long <- renderRHandsontable({
                       rhandsontable(dat) %>%

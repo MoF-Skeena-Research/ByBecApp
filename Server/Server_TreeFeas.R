@@ -146,7 +146,7 @@ prepDatSimple <- reactive({
   },
   error = function(e){
     invisible(lapply(dbListConnections(PostgreSQL()), dbDisconnect))
-    con <<- dbConnect(drv, user = "postgres", password = "postgres", host = "138.197.168.220", 
+    con <<- dbConnect(drv, user = "postgres", password = "PowerOfBEC", host = "138.197.168.220", 
                       port = 5432, dbname = "spp_feas")
     dat <- dbGetQuery(con, QRY)
     return(dat)
