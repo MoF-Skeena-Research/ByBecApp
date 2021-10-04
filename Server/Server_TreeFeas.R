@@ -34,7 +34,7 @@ observeEvent(input$updatedfeas,{
 output$downloadFeas <- downloadHandler(
   filename = "FeasibilityUpdates.csv",
   content = function(file){
-    dat <- dbGetQuery(con,"SELECT bgc,ss_nospace,sppsplit,feasible,newfeas,mod FROM feasorig")
+    dat <- dbGetQuery(sppDb,"SELECT bgc,ss_nospace,sppsplit,feasible,newfeas,mod FROM feasorig")
     dat <- as.data.table(dat)
     setnames(dat, old = "sppsplit",new = "spp")
     fwrite(dat, file)
@@ -45,7 +45,7 @@ output$downloadFeas <- downloadHandler(
 output$downloadAudit <- downloadHandler(
   filename = "FeasibilityAudit.csv",
   content = function(file){
-    dat <- dbGetQuery(con,"SELECT * FROM feas_audit")
+    dat <- dbGetQuery(sppDb,"SELECT * FROM feas_audit")
     dat <- as.data.table(dat)
     fwrite(dat, file)
   }
@@ -54,7 +54,7 @@ output$downloadAudit <- downloadHandler(
 output$downloadPest <- downloadHandler(
   filename = "PestUpdates.csv",
   content = function(file){
-    dat <- dbGetQuery(con,"SELECT * FROM forhealth")
+    dat <- dbGetQuery(sppDb,"SELECT * FROM forhealth")
     dat <- as.data.table(dat)
     fwrite(dat, file)
   }
@@ -96,7 +96,7 @@ observeEvent({c(input$showtrees,
                   if(!is.null(input$showtrees)){
                     QRY <- paste0("select spp,plotnum,geometry from plotdata where spp = '",sppName,"' and region in ('",
                                   paste(input$showtrees,collapse = "','"),"')")
-                    dat <- st_read(con,query = QRY)
+                    dat <- st_read(sppDb,query = QRY)
                     if(nrow(dat) > 0){
                       dat <- dat["plotnum"]
                       colnames(dat)[1] <- "label"
@@ -109,7 +109,7 @@ observeEvent({c(input$showtrees,
                       removeGlPoints("tree_plot")
                   }
                   if(!is.null(input$trials)){
-                    dat2 <- st_read(con,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where spp like '",
+                    dat2 <- st_read(sppDb,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where spp like '",
                                                        sppName,"%' and project_id in ('",paste(input$trials,collapse = "','"),
                                                        "') and planted > '", input$trialStart[1],"' and planted < '",input$trialStart[2],"'"))
                     if(nrow(dat2) == 0){
@@ -141,22 +141,13 @@ prepDatSimple <- reactive({
   QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
                 " from feasorig where spp = '",substr(input$sppPick,1,2),
                 "' and ",globalFeas$dat," in (1,2,3,4,5)")
-  d1 <- tryCatch({
-    dbGetQuery(con, QRY)
-  },
-  error = function(e){
-    invisible(lapply(dbListConnections(PostgreSQL()), dbDisconnect))
-    con <<- dbConnect(drv, user = "postgres", password = "PowerOfBEC", host = "138.197.168.220", 
-                      port = 5432, dbname = "spp_feas")
-    dat <- dbGetQuery(con, QRY)
-    return(dat)
-  })
+  d1 <- dbGetQuery(sppDb, QRY)
   if(nrow(d1) == 0){
     shinyalert(title = "Oops!",text = "There are no data for that species",
                type = "error",showConfirmButton = T)
     QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
                   " from feasorig where spp = 'Sx' and ",globalFeas$dat," in (1,2,3,4,5)")
-    d1 <- dbGetQuery(con, QRY)
+    d1 <- dbGetQuery(sppDb, QRY)
   }
   feas <- as.data.table(d1)
   setnames(feas, old = globalFeas$dat, new = "feasible")
@@ -211,7 +202,7 @@ prepFreq <- reactive({
   QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
                 " from feasorig where spp = '",substr(input$sppPick,1,2),
                 "' and ",globalFeas$dat," in (1,2,3,4,5)")
-  feas <- as.data.table(dbGetQuery(con, QRY))
+  feas <- as.data.table(dbGetQuery(sppDb, QRY))
   setnames(feas, old = globalFeas$dat, new = "feasible")
   minDist <- feas[,.SD[feasible == min(feasible, na.rm = T)],by = .(bgc,sppsplit)]
   tf2 <- minDist[feasible %in% c(4,5),]
@@ -259,7 +250,7 @@ prepEdaDat <- reactive({
   QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
                 " from feasorig where spp = '",substr(input$sppPick,1,2),
                 "' and ",globalFeas$dat," in (1,2,3,4)")
-  feas <- as.data.table(dbGetQuery(con, QRY))
+  feas <- as.data.table(dbGetQuery(sppDb, QRY))
   setnames(feas, old = globalFeas$dat, new = "feasible")        
   globalLeg$Legend <- edaLeg
   id <- as.numeric(input$edaplot_selected)
@@ -328,7 +319,7 @@ prepTable <- reactive({
   idx_col <- NULL
   QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
                 " from feasorig where bgc = '",unit,"' and ",globalFeas$dat," in (1,2,3,4)")
-  feas <- as.data.table(dbGetQuery(con, QRY))
+  feas <- as.data.table(dbGetQuery(sppDb, QRY))
   if(nrow(feas) == 0){
     shinyalert("Oopsies!","There are no species in that subzone :(")
     return(list(dat = feas, rIdx = NULL, cIdx = NULL, sppCol = NULL))
@@ -349,7 +340,7 @@ prepTable <- reactive({
     if(input$updatedfeas){
       QRY <- paste0("select ss_nospace,sppsplit,feasible from feasorig where bgc = '",
                     unit,"' and feasible in (1,2,3,4)")
-      feasOrig <- as.data.table(dbGetQuery(con, QRY))
+      feasOrig <- as.data.table(dbGetQuery(sppDb, QRY))
       dat2 <- feasOrig[ss_nospace %in% edaSub$ss_nospace,]
       setnames(dat2, old = "feasible", new = "FeasOld")
       comp <- merge(dat,dat2,on = c("ss_nospace","sppsplit"),all = T)
@@ -431,7 +422,7 @@ sendToDb <- function(nme){
   unit <- globalSelBEC()
   QRY <- paste0("select fid,bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
                 " from feasorig where bgc = '",unit,"' and ",globalFeas$dat," in (1,2,3,4)")
-  datOrig <- as.data.table(dbGetQuery(con, QRY))
+  datOrig <- as.data.table(dbGetQuery(sppDb, QRY))
   setnames(datOrig,old = globalFeas$dat, new = "feasible")
   dat <- melt(dat, id.vars = "ss_nospace", value.name = "newfeas", variable.name = "sppsplit")
   dat2 <- datOrig[dat, on = c("ss_nospace","sppsplit")]
@@ -440,24 +431,24 @@ sendToDb <- function(nme){
   dat2[,mod := nme]
   datAudit <- dat2[,.(fid,ss_nospace,sppsplit,newfeas,mod)]
   datAudit[,date := Sys.Date()]
-  dbWriteTable(con,"feas_audit", datAudit, append = T, row.names = F)
+  dbWriteTable(sppDb,"feas_audit", datAudit, append = T, row.names = F)
   datNew <- dat2[is.na(bgc),]
   datOld <- dat2[!is.na(bgc),]
   if(nrow(datNew) > 0){
     temp <- data.table(bgc = gsub("/.*","",datNew$ss_nospace),ss_nospace = datNew$ss_nospace,
                        sppsplit = datNew$sppsplit,feasible = NA, 
                        spp = substr(datNew$sppsplit,1,2),newfeas = datNew$newfeas,mod = nme)
-    dbWriteTable(con,"feasorig",temp, append = T,row.names = F)
+    dbWriteTable(sppDb,"feasorig",temp, append = T,row.names = F)
   }
   if(nrow(datOld) > 0){
-    dbWriteTable(con, "temp_update", datOld, overwrite = T)
-    dbExecute(con,"UPDATE feasorig 
+    dbWriteTable(sppDb, "temp_update", datOld, overwrite = T)
+    dbExecute(sppDb,"UPDATE feasorig 
                   SET newfeas = temp_update.newfeas,
                   mod = temp_update.mod
                   FROM temp_update
                   WHERE feasorig.ss_nospace = temp_update.ss_nospace
                   AND feasorig.sppsplit = temp_update.sppsplit")
-    dbExecute(con,"UPDATE feasorig
+    dbExecute(sppDb,"UPDATE feasorig
                   SET newfeas = 5
                   WHERE newfeas IS NULL
                   AND feasible IS NOT NULL")
@@ -504,7 +495,7 @@ addSppToDb <- function(x){
                        feasible = NA,spp = substr(input$sppPickAdd,1,2), newfeas = dat$newfeas, mod = input$addsppMod)
     
     dat2 <- dat2[!is.na(newfeas),]
-    dbWriteTable(con, name = "feasorig", value = dat2, append = T,row.names = F)
+    dbWriteTable(sppDb, name = "feasorig", value = dat2, append = T,row.names = F)
     shinyalert("Thank you!","Your updates have been recorded", type = "info",
                imageUrl = "images/puppy1.jpg",imageHeight = "100px",inputId = "dbmessage")
   }

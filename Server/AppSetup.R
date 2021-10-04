@@ -8,13 +8,14 @@ library(ggiraph)
 library(scales)
 library(rhandsontable)
 library(shinyalert)
-library(RPostgreSQL)
+library(RPostgres)
 library(shinyjs)
 library(leafgl)
 library(leaflet)
 library(colourvalues)
 library(shinythemes)
 library(gridExtra)
+library(pool)
 
 ##connect to database
 ###Read in climate summary data
@@ -22,15 +23,31 @@ mbtk="pk.eyJ1Ijoid2htYWNrZW4iLCJhIjoiY2twaDVkNXU5MmJieTJybGE3cWRtY3Q4aCJ9.ISBkzS
 mblbsty = "whmacken/ckph5q6d21q1318nz4shnyp20"
 mbsty="whmacken/ckph5e7y01fhr17qk5nhnpo10"
 
+sppDb <- dbPool(
+  drv = RPostgres::Postgres(),
+  dbname = "spp_feas",
+  host = "138.197.168.220",
+  port = 5432, 
+  user = "postgres",
+  password = "PowerOfBEC"
+)
+onStop(function() {
+  poolClose(sppDb)
+})
+climDb <- dbPool(
+  drv = RPostgres::Postgres(),
+  dbname = "bgc_climate_data",
+  host = "138.197.168.220",
+  port = 5432, 
+  user = "postgres",
+  password = "PowerOfBEC"
+)
+onStop(function() {
+  poolClose(climDb)
+})
+
 subzones_colours_ref <- fread("./inputs/WNA_v12_HexCols.csv")
 setnames(subzones_colours_ref,c("BGC","Col"))
-
-drv <- dbDriver("PostgreSQL")
-sapply(dbListConnections(drv), dbDisconnect)
-con <- dbConnect(drv, user = "postgres", password = "PowerOfBEC", host = "138.197.168.220", 
-                 port = 5432, dbname = "spp_feas")
-climcon <- dbConnect(drv, user = "postgres", password = "PowerOfBEC", host = "138.197.168.220", 
-                 port = 5432, dbname = "bgc_climate_data")
 
 ##data for edatopic grid
 grd1x <- seq(1.5,4.5,1)
@@ -86,11 +103,11 @@ allSppNames <- unlist(sppList)
 allSppNames <- substr(allSppNames,1,2)
 allSppNames <- unname(allSppNames)
 
-minStart <- dbGetQuery(con,"select min(planted) from offsite")[1,1]
-maxStart <- dbGetQuery(con,"select max(planted) from offsite")[1,1]
+minStart <- dbGetQuery(sppDb,"select min(planted) from offsite")[1,1]
+maxStart <- dbGetQuery(sppDb,"select max(planted) from offsite")[1,1]
 
-offsiteNames <- dbGetQuery(con,"select distinct plotid from offsite")[,1]
-offsiteProj <- dbGetQuery(con,"select distinct project_id from offsite")[,1]
+offsiteNames <- dbGetQuery(sppDb,"select distinct plotid from offsite")[,1]
+offsiteProj <- dbGetQuery(sppDb,"select distinct project_id from offsite")[,1]
 ##max suitability colours
 ##BGC colours
 zones <- fread("inputs/BGCZones.csv")
@@ -102,7 +119,7 @@ subzTransparent <- copy(subzones_colours_ref)
 subzTransparent[,Col := "#FFFFFF00"]
 setnames(subzTransparent,c("bgc","Transparent"))
 
-eda <- dbGetQuery(con,"select * from eda")
+eda <- dbGetQuery(sppDb,"select * from eda")
 eda <- as.data.table(eda)
 suitcols <- data.table(Suit = c(1,2,3),Col = c("#443e3dFF","#736e6eFF","#a29f9eFF"))#c("#42CF20FF","#ECCD22FF","#EC0E0EFF")
 ##climatic suitability colours

@@ -18,9 +18,7 @@
 
 source("Server/AppSetup.R") ##load a prepare data
 source("Server/FeasAppSource.R") ##javascript functions
-onStop(function(){
-    dbDisconnect(con)
-})
+
 # Define UI for application that draws a histogram
 ui <- fluidPage(theme = shinytheme("lumen"),
                 tags$head(HTML("<title>Power of BEC</title>")),
@@ -323,65 +321,7 @@ server <- function(input, output, session) {
     source("Server/Server_ForHealth.R",local = T)
     source("Server/Server_ClimSum.R",local = T)
     source("Server/Server_FindBGC.R",local = T)
-    
-    onStop(function() {
-        dbDisconnect(conn = con)
-        dbDisconnect(conn = climcon)
-    })
 }
 
 # Run the application 
 shinyApp(ui = ui, server = server)
-
-# ###calculate climatic suitability colours
-# prepClimSuit <- reactive({
-#     QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
-#                   " from feasorig where spp = '",substr(input$sppPick,1,2),
-#                   "' and ",globalFeas$dat," in (1,2,3,4,5)")
-#     feas <- as.data.table(dbGetQuery(con, QRY))
-#     setnames(feas, old = globalFeas$dat, new = "feasible")
-#     tempFeas <- feas[feasible %in% c(1,2,3),]
-#     minDist <- tempFeas[,.SD[feasible == min(feasible, na.rm = T)],by = .(bgc)]
-#     abUnits <- minDist[grep("[[:alpha:]] */[[:alpha:]]+$",ss_nospace),]
-#     noAb <- minDist[!grepl("[[:alpha:]] */[[:alpha:]]+$",ss_nospace),]
-#     abUnits <- eda[abUnits, on = "ss_nospace"] ##merge
-#     abUnits <- abUnits[,.(Temp = if(any(grepl("C4",edatopic))) paste0(ss_nospace,"_01") else ss_nospace, feasible = feasible[1]),
-#                        by = .(bgc,ss_nospace,sppsplit,spp)]
-#     abUnits[,ss_nospace := NULL]
-#     setnames(abUnits,old = "Temp",new = "ss_nospace")
-#     minDist <- rbind(noAb,abUnits)
-#     minDist[,ID := if(any(grepl("01", ss_nospace)) & feasible[1] == 1) T else F, by = .(bgc)]
-#     green <- minDist[(ID),]
-#     green <- green[,.(Col = zonalOpt), by = .(bgc)]
-#     
-#     minDist <- minDist[ID == F,]
-#     minDist[,ID := if(any(grepl("01", ss_nospace))) T else F, by = .(bgc)]
-#     blue <- minDist[(ID),]
-#     blue <- blue[,.(feasible = min(feasible)), by = .(bgc)]
-#     
-#     minDist <- minDist[ID == F,]
-#     minEda <- eda[minDist, on = "ss_nospace"]
-#     minEda <- minEda[,.(AvgEda = mean(smr)), by = .(bgc,ss_nospace,feasible)]
-#     minEda <- minEda[,.(Col = fifelse(all(AvgEda >= 3.5),"WET",
-#                                       fifelse(all(AvgEda < 3.5), "DRY", splitOpt)), feasible = min(feasible)), by = .(bgc)]
-#     temp <- minEda[Col == "DRY",]
-#     temp[,Col := NULL]
-#     blue <- rbind(blue,temp)
-#     red <- minEda[Col == "WET",]
-#     minEda <- minEda[!Col %in% c("WET","DRY"),.(bgc,Col)]
-#     blue[dryOpt, Col := i.Col, on = "feasible"]
-#     red[wetOpt, Col := i.Col, on = "feasible"]
-#     blue[,feasible := NULL]
-#     red[,feasible := NULL]
-#     climSuit <- rbind(green,blue,red,minEda)
-#     climSuit <- climSuit[!is.na(bgc),]
-#     
-#     tf2 <- feas[feasible %in% c(4,5),.(SuitMax = min(feasible)), by = .(bgc)]
-#     if(nrow(tf2) > 0){
-#         tf2[SuitMax == 4,Col := "#fbff00ff"]
-#         tf2[SuitMax == 5,Col := "#8300ffff"]
-#         tf2 <- tf2[,.(bgc,Col)]
-#         climSuit <- rbind(climSuit, tf2)
-#     }
-#     return(climSuit)
-# })
