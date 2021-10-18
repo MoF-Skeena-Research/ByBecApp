@@ -34,7 +34,7 @@ output$offsiteMap <- renderLeaflet({
 observeEvent(input$trialSelect,{
   output$assIn <- renderRHandsontable({
     if(input$trialSelect != ""){
-      dat <- dbGetQuery(con,paste0("select plotid,spp,numplanted,seedlot,assessment from offsite where plotid = '",
+      dat <- dbGetQuery(sppDb,paste0("select plotid,spp,numplanted,seedlot,assessment from offsite where plotid = '",
                                    input$trialSelect,"'"))
       dat <- unique(as.data.table(dat))
       rhandsontable(dat) %>%
@@ -46,8 +46,8 @@ observeEvent(input$trialSelect,{
 observeEvent(input$submitAss,{
   dat <- as.data.table(hot_to_r(input$assIn))
   dat[,mod := input$assessMod]
-  dbWriteTable(con, "temp_ass_update", dat, overwrite = T)
-  dbExecute(con,"UPDATE offsite
+  dbWriteTable(sppDb, "temp_ass_update", dat, overwrite = T)
+  dbExecute(sppDb,"UPDATE offsite
                   SET assessment = temp_ass_update.assessment,
                   mod = temp_ass_update.mod
                   FROM temp_ass_update
@@ -83,7 +83,7 @@ observeEvent(input$submitTrial,{
             project_id = input$addTr_proj, mod = input$trialMod,
             lat = input$addTr_lat,long = input$addTr_long)]
   dat <- st_as_sf(dat, coords = c("long","lat"), crs = 4326)
-  st_write(dat, con, "offsite", append = TRUE)
+  st_write(dat, sppDb, "offsite", append = TRUE)
   shinyalert("Thank you!","Your trial has been recorded", type = "info", inputId = "trialMessage")
   updateTextInput(session,"addTr_id",value = "")
   updateDateInput(session,"addTr_planted",value = as.Date("2000-01-01"))
@@ -97,21 +97,21 @@ observeEvent({c(input$trials2,
                   if(!is.null(input$trials2)){
                     if(input$multiSppTrial){
                       if(input$sppPick2 == "All"){
-                        dat2 <- st_read(con,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
+                        dat2 <- st_read(sppDb,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
                                                            "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],
                                                            "' and plotid in (select plotid from offsite group by plotid having count(distinct spp) > 1)"))
                       }else{
-                        dat2 <- st_read(con,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
+                        dat2 <- st_read(sppDb,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
                                                            "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],"' and spp like '", substr(input$sppPick2,1,2),
                                                            "%' and plotid in (select plotid from offsite group by plotid having count(distinct spp) > 1)"))
                       }
                     }else{
                       if(input$sppPick2 == "All"){
-                        dat2 <- st_read(con,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
+                        dat2 <- st_read(sppDb,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
                                                            "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],
                                                            "'"))
                       }else{
-                        dat2 <- st_read(con,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
+                        dat2 <- st_read(sppDb,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
                                                            "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],"' and spp like '", substr(input$sppPick2,1,2),
                                                            "%'"))
                       }

@@ -4,17 +4,17 @@ observeEvent(input$showinstr_climmap,{
 
 getInputDat <- function(){
   ####Set up choices
-  climsumInputs$BGC.choose <- dbGetQuery(climcon, "SELECT bgc from bgcall")$bgc
-  climsumInputs$BGC.chooseBC <- dbGetQuery(climcon, "SELECT bgc from bgcall where region = 'BC'")$bgc
-  period.choose <- dbGetQuery(climcon, "SELECT period from periodhist")$period
+  climsumInputs$BGC.choose <- dbGetQuery(climDb, "SELECT bgc from bgcall")$bgc
+  climsumInputs$BGC.chooseBC <- dbGetQuery(climDb, "SELECT bgc from bgcall where region = 'BC'")$bgc
+  period.choose <- dbGetQuery(climDb, "SELECT period from periodhist")$period
   climsumInputs$period.choose <- period.choose
-  climsumInputs$fp.choose <- dbGetQuery(climcon, "SELECT period from periodfut")$period
+  climsumInputs$fp.choose <- dbGetQuery(climDb, "SELECT period from periodfut")$period
   period.ts <- c("1901 - 1930","1931 - 1960","1961 - 1990","1991 - 2020","2021-2040",
                  "2041-2060","2061-2080","2081-2100")
   climsumInputs$period.ts <- period.ts
   climsumInputs$period.other <- period.choose[!period.choose %in% period.ts]
-  climsumInputs$stat.choose <- dbGetQuery(climcon, "SELECT stat from statopts")$stat
-  var.choose <- dbGetQuery(climcon, "SELECT climvar from climvaropts")[,1]
+  climsumInputs$stat.choose <- dbGetQuery(climDb, "SELECT stat from statopts")$stat
+  var.choose <- dbGetQuery(climDb, "SELECT climvar from climvaropts")[,1]
   climsumInputs$var.choose <- var.choose
   monthly <- var.choose[grep("01|02|03|04|05|06|07|08|09|10|11|12", var.choose)]
   seasonal <- var.choose[grep("_sp|_sm|_at|_wt", var.choose)]
@@ -68,9 +68,9 @@ observeEvent({c(input$map_climvar,input$map_scn,input$map_stat)}, {
     climsumExtreme$Min = NA
     climsumExtreme$Max = NA
   }else{
-    mx <- dbGetQuery(climcon,paste0("SELECT MAX(value) FROM szsum_fut WHERE climvar = '",
+    mx <- dbGetQuery(climDb,paste0("SELECT MAX(value) FROM szsum_fut WHERE climvar = '",
                                     input$map_climvar, "' and stat = 'mean' and scenario = '",input$map_scn,"'"))$max
-    mn <- dbGetQuery(climcon,paste0("SELECT MIN(value) FROM szsum_curr WHERE climvar = '",
+    mn <- dbGetQuery(climDb,paste0("SELECT MIN(value) FROM szsum_curr WHERE climvar = '",
                                     input$map_climvar, "' and stat = 'mean'"))$min
     climsumExtreme$Min = mn
     climsumExtreme$Max = mx
@@ -98,7 +98,7 @@ observeEvent({c(input$map_period,input$map_climvar,input$map_scn,input$map_stat)
                    climvar,"' AND stat = '",currstat,"'")
     }
     
-    dat <- as.data.table(dbGetQuery(climcon,q1))
+    dat <- as.data.table(dbGetQuery(climDb,q1))
     dat <- unique(dat, by = "bgc")
     dat[,lab := paste0(bgc,"<br>",round(value,2))]
     dat[,col := colour_values(-1*c(climsumExtreme$Min,climsumExtreme$Max,value), palette = "rdylgn")[-(1:2)]]
@@ -129,25 +129,14 @@ getData <- reactive({
   q2 <- paste0("SELECT bgc, period,stat, climvar, value FROM ",
                tabFut," WHERE bgc = '",input$clim_click,"' AND period IN ('",paste(period.fut,collapse = "','"),
                "') AND climvar = '",selectVar,"' AND scenario = '",input$map_scn,"'")
-  
-    climSubset <- tryCatch({
-      dbGetQuery(climcon, q1)
-    },
-    error = function(e){
-      dbClearResult(dbListResults(con)[[1]])
-      invisible(lapply(dbListConnections(PostgreSQL()), dbDisconnect))
-      climcon <<- dbConnect(drv, user = "postgres", password = "postgres", host = "138.197.168.220", 
-                        port = 5432, dbname = "bgc_climate_data")
-      dat <- dbGetQuery(climcon, q1)
-      return(dat)
-    })
-    futureSub <- dbGetQuery(climcon, q2)
-    ##browser()
-    climSubset <- as.data.table(rbind(climSubset, futureSub))
-    climSubset <- dcast(climSubset, period+stat+climvar~bgc, fun.aggregate = mean)
-    setorder(climSubset,climvar)
-    setnames(climSubset, old = c("period","stat","climvar"), new = c("TimePeriod","Statistic","ClimateVar"))
-    setcolorder(climSubset,c(1,3,2,4:length(climSubset)))
+  climSubset <- dbGetQuery(climDb, q1)
+  futureSub <- dbGetQuery(climDb, q2)
+  ##browser()
+  climSubset <- as.data.table(rbind(climSubset, futureSub))
+  climSubset <- dcast(climSubset, period+stat+climvar~bgc, fun.aggregate = mean)
+  setorder(climSubset,climvar)
+  setnames(climSubset, old = c("period","stat","climvar"), new = c("TimePeriod","Statistic","ClimateVar"))
+  setcolorder(climSubset,c(1,3,2,4:length(climSubset)))
 
   return(climSubset)
 })
@@ -235,18 +224,8 @@ getData_Plots <- reactive({
                paste(selectVars,collapse = "','"),"') AND region = '",selectBC,"'")
   
   if(length(selectVars) > 0){
-    climSubset <- tryCatch({
-      dbGetQuery(climcon, q1)
-    },
-    error = function(e){
-      dbClearResult(dbListResults(con)[[1]])
-      invisible(lapply(dbListConnections(PostgreSQL()), dbDisconnect))
-      con <<- dbConnect(drv, user = "postgres", password = "postgres", host = "138.197.168.220", 
-                        port = 5432, dbname = "bgc_climate_data")
-      dat <- dbGetQuery(con, q1)
-      return(dat)
-    })
-    futureSub <- dbGetQuery(climcon, q2)
+    climSubset <- dbGetQuery(climDb, q1)
+    futureSub <- dbGetQuery(climDb, q2)
     ##browser()
     climSubset <- as.data.table(rbind(climSubset, futureSub))
     climSubset <- dcast(climSubset, period+stat+climvar~bgc, fun.aggregate = mean)

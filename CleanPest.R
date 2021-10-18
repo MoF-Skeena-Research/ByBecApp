@@ -106,15 +106,38 @@ allDat[,hazard_update := hazard]
 allDat[,mod := NA]
 fwrite(allDat,"PestForDB.csv")
 
+##update forhealth table
 drv <- dbDriver("PostgreSQL")
 sapply(dbListConnections(drv), dbDisconnect)
-con <- dbConnect(drv, user = "postgres", password = "Kiriliny41", host = "68.183.199.104", 
+con <- dbConnect(drv, user = "postgres", password = "PowerOfBEC", host = "138.197.168.220", 
                  port = 5432, dbname = "spp_feas")
 highPest <- dbGetQuery(con, "select * from forhealth")
+fwrite(highPest,"ForHealthSave.csv")
+highPest <- old
 highPest <- as.data.table(highPest)
-highPest <- highPest[hazard != "UN",]
-highPest[,hazard_update := NULL]
-highPest[,mod := NULL]
+new_table <- fread("FullListofBGCbyHostbyPest.csv")
+new_table[,c("hazard_update","mod") := NULL]
+setnames(new_table, old = c("hazard","pest_name"), new = c("new_hazard","new_name"))
+addPest <- merge(highPest,new_table, on = c("bgc","treecode","pest"), all = T)
+addPest[(!is.na(new_hazard)) & hazard_update == "UN",`:=`(hazard = new_hazard,hazard_update = new_hazard, mod = NA)]
+addPest[!is.na(new_name),pest_name := new_name]
+addPest <- addPest[bgc != "",!c("new_name","new_hazard")]
+bgc_crosswalk <- data.table(old = c("PPxh3","MSmw1","MSmw2","IDFmw1","CWHmm","BGmk_ID"), new = c("IDFxx1","ESSFdh1","ESSFdh2","ICHxm1", "CWHmm1","BGmk_MT"))
+addPest[bgc_crosswalk,NewBGC := i.new, on = c(bgc = "old")]
+addPest[!is.na(NewBGC),bgc := NewBGC]
+addPest[,NewBGC := NULL]
+bgcInfo <- fread("All_BGCs_Info_v12_10.csv")
+bgcInfo <- bgcInfo[,.(BGC,DataSet)]
+addPest[bgcInfo,region := i.DataSet, on = c(bgc = "BGC")]
+addPest[hazard == hazard_update, mod := NA_character_]
+dbExecute(con,"drop table forhealth")
+dbWriteTable(con, "forhealth",addPest,row.names = F)
+
+old <- fread("ForHealthSave.csv")
+new <- addPest
+# highPest <- highPest[hazard != "UN",]
+# highPest[,hazard_update := NULL]
+# highPest[,mod := NULL]
 
 dbExecute(con,"drop table forhealth")
 dbWriteTable(con,"forhealth",allDat,row.names = F)
