@@ -60,3 +60,9 @@ dbExecute(sppDb,"create index on feasorig (spp)")
 ##update species names
 
 
+ycUpdate <- fread("~/Downloads/USAplotswithYc.csv")
+ycUpdate[,`:=`(sppsplit = "Yc",spp = "Yc",region = "US")]
+library(sf)
+yc <- st_as_sf(ycUpdate,coords = c("Longitude","Latitude"), crs = 4326)
+colnames(yc)[1] <- "plotnum"
+st_write(yc,sppDb,"plotdata",append = T, row.names = F)
