@@ -3,7 +3,7 @@ library(data.table)
 library(sf)
 
 drv <- dbDriver("PostgreSQL")
-con <- dbConnect(drv, user = "postgres", password = "postgres", host = "138.197.168.220", 
+con <- dbConnect(drv, user = "postgres", password = "PowerOfBEC", host = "138.197.168.220", 
                  port = 5432, dbname = "spp_feas")
 
 ##update forest health
@@ -44,7 +44,7 @@ dbSafeNames = function(names) {
   names
 }
 
-feas <- fread("~/CommonTables/Feasibility_v12_8.csv")
+feas <- fread("~/CommonTables/Feasibility_v12_9.csv")
 feas <- feas[,.(BGC,SS_NoSpace,SppVar,Feasible)]
 setnames(feas, old = "SppVar",new = "SppSplit")
 feas[,Spp := SppSplit]
@@ -60,7 +60,7 @@ feas[,mod := NA_character_]
 feas <- feas[sppsplit != "X",]
 feas[,fid := seq_along(feas$bgc)]
 
-eda <- fread("~/CommonTables/Edatopic_v12_6.csv")
+eda <- fread("~/CommonTables/Edatopic_v12_9.csv")
 #eda <- eda[is.na(Special) | Special == "",.(BGC,SS_NoSpace,Edatopic)]
 
 eda[,SMR := as.numeric(gsub("[[:alpha:]]","", Edatopic))]
