@@ -5,43 +5,48 @@ observeEvent(input$showinstr_offsite,{
   shinyalert(title = "Instructions",html = T,text = instr_offsite)
 })
 
-output$offsiteMap <- renderLeaflet({
-  leaflet() %>%
-    setView(lng = -122.77222, lat = 51.2665, zoom = 6) %>%
-    addProviderTiles(leaflet::providers$CartoDB.PositronNoLabels, group = "Positron",
-                     options = leaflet::pathOptions(pane = "mapPane")) %>%
-    leaflet::addProviderTiles(leaflet::providers$Esri.WorldImagery, group = "Satellite",
-                              options = leaflet::pathOptions(pane = "mapPane")) %>%
-    leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap",
-                              options = leaflet::pathOptions(pane = "mapPane")) %>%
-    leaflet::addTiles(
-      urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
-      attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
-      group = "Hillshade",
-      options = leaflet::pathOptions(pane = "mapPane")) %>%
-    leaflet::addTiles(
-      urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mblbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
-      attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
-      group = "Cities",
-      options = leaflet::pathOptions(pane = "overlayPane")) %>%
-    addBGCTiles() %>%
-    leaflet::addLayersControl(
-      baseGroups = c("Hillshade","Positron","Satellite", "OpenStreetMap"),
-      overlayGroups = c("BGCs","Districts","Cities"),
-      position = "topright")
+observeEvent(input$tabs,{
+  if(input$tabs == "tab2"){
+    output$offsiteMap <- renderLeaflet({
+      leaflet() %>%
+        setView(lng = -122.77222, lat = 51.2665, zoom = 6) %>%
+        addProviderTiles(leaflet::providers$CartoDB.PositronNoLabels, group = "Positron",
+                         options = leaflet::pathOptions(pane = "mapPane")) %>%
+        leaflet::addProviderTiles(leaflet::providers$Esri.WorldImagery, group = "Satellite",
+                                  options = leaflet::pathOptions(pane = "mapPane")) %>%
+        leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap",
+                                  options = leaflet::pathOptions(pane = "mapPane")) %>%
+        leaflet::addTiles(
+          urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
+          attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
+          group = "Hillshade",
+          options = leaflet::pathOptions(pane = "mapPane")) %>%
+        leaflet::addTiles(
+          urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mblbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
+          attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
+          group = "Cities",
+          options = leaflet::pathOptions(pane = "overlayPane")) %>%
+        addBGCTiles() %>%
+        leaflet::addLayersControl(
+          baseGroups = c("Hillshade","Positron","Satellite", "OpenStreetMap"),
+          overlayGroups = c("BGCs","Districts","Cities"),
+          position = "topright")
+    })
+    
+    observeEvent(input$trialSelect,{
+      output$assIn <- renderRHandsontable({
+        if(input$trialSelect != ""){
+          dat <- dbGetQuery(sppDb,paste0("select plotid,spp,numplanted,seedlot,assessment from offsite where plotid = '",
+                                         input$trialSelect,"'"))
+          dat <- unique(as.data.table(dat))
+          rhandsontable(dat) %>%
+            hot_col(col = "assessment",type = "dropdown",source = c("Fail","Poor","Fair","Good","Excellent","UN"))
+        }
+      })
+    })
+  }
 })
 
-observeEvent(input$trialSelect,{
-  output$assIn <- renderRHandsontable({
-    if(input$trialSelect != ""){
-      dat <- dbGetQuery(sppDb,paste0("select plotid,spp,numplanted,seedlot,assessment from offsite where plotid = '",
-                                   input$trialSelect,"'"))
-      dat <- unique(as.data.table(dat))
-      rhandsontable(dat) %>%
-        hot_col(col = "assessment",type = "dropdown",source = c("Fail","Poor","Fair","Good","Excellent","UN"))
-    }
-  })
-})
 
 observeEvent(input$submitAss,{
   dat <- as.data.table(hot_to_r(input$assIn))

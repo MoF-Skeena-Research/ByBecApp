@@ -39,7 +39,8 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                                           choices = c("None",sppList),
                                                           selected = "Cw - western redcedar"),                                         
                                               h4("Map Display"),
-                                              checkboxInput("updatedfeas","Show Updated Range and Feasibility",value = F, width = "250px"),
+                                              checkboxInput("updatedfeas","Show Original Feasibility",value = F, width = "250px"),
+                                              checkboxInput("showadd","Show Additions/Deletions",value = F, width = "250px"),
                                               checkboxInput("showFreq","Show Frequency",value = T),
                                               h4("Edatopic Feasibility:"),
                                               girafeOutput("edaplot",height = "350px"),
@@ -262,7 +263,7 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                        )
                                )
                         ),
-                    tabPanel("Find a BGC",
+                    tabPanel(value = "tab6", title = "Find a BGC",
                              fluidRow(
                                  column(2,
                                         selectInput("selectBGC","Select Zone", 
@@ -295,7 +296,7 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                      necessary. The site also contains a utility tool, 'Find a BGC', which 
                                      provides and easy way to select BGCs either by location or name. Each app
                                      contains an Intructions button, which will pop-up detailed information 
-                                     about the app. Remember: BEC is God!", style = "font-size:18px"),
+                                     about the app.", style = "font-size:18px"),
                                    hr(),
                                    h3("Authors"),
                                    p("Site Author: Kiri Daust"),
