@@ -209,3 +209,8 @@ d1 <- d1[Use == 'y',]
 d1[PEST_SPECIES_LATIN_NAME == "", PEST_SPECIES_LATIN_NAME := PEST_SPECIES_COMMON_NAME]
 d1 <- d1[,!c("Use","PEST_TYPE","PEST_SPECIES_LATIN_NAME")]
 fwrite(d1,"Pest_Host_Decid.csv")
+
+library(tictoc)
+tic()
+dat <- dbGetQuery(sppDb,"select * from feasorig")
+toc()
