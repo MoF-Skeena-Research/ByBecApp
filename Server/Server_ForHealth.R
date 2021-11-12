@@ -22,35 +22,40 @@ observeEvent(input$fhSpp,{
   }
 })
 
-output$fhMap <- renderLeaflet({
-  leaflet() %>%
-    setView(lng = -122.77222, lat = 51.2665, zoom = 6) %>%
-    addProviderTiles(leaflet::providers$CartoDB.PositronNoLabels, group = "Positron",
-                     options = leaflet::pathOptions(pane = "mapPane")) %>%
-    leaflet::addProviderTiles(leaflet::providers$Esri.WorldImagery, group = "Satellite",
-                              options = leaflet::pathOptions(pane = "mapPane")) %>%
-    leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap",
-                              options = leaflet::pathOptions(pane = "mapPane")) %>%
-    leaflet::addTiles(
-      urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
-      attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
-      group = "Hillshade",
-      options = leaflet::pathOptions(pane = "mapPane")) %>%
-    leaflet::addTiles(
-      urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mblbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
-      attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
-      group = "Cities",
-      options = leaflet::pathOptions(pane = "overlayPane")) %>%
-    addBGCTiles() %>%
-    leaflet::addLayersControl(
-      baseGroups = c("Hillshade","Positron","Satellite", "OpenStreetMap"),
-      overlayGroups = c("BGCs","Pests","Districts","Cities"),
-      position = "topright") %>%
-    addLegend(position = "bottomright",
-              labels = c("Unspecified","Low","Moderate","High","Outside Range"),
-              colors = c("#443e3d","#0CC200","#FFEF01","#D80000","#840090"),
-              title = "Hazard",
-              layerId = "bec_fh")
+observeEvent(input$tabs,{
+  if(input$tabs == "tab3"){
+    output$fhMap <- renderLeaflet({
+      leaflet() %>%
+        setView(lng = -122.77222, lat = 51.2665, zoom = 6) %>%
+        addProviderTiles(leaflet::providers$CartoDB.PositronNoLabels, group = "Positron",
+                         options = leaflet::pathOptions(pane = "mapPane")) %>%
+        leaflet::addProviderTiles(leaflet::providers$Esri.WorldImagery, group = "Satellite",
+                                  options = leaflet::pathOptions(pane = "mapPane")) %>%
+        leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap",
+                                  options = leaflet::pathOptions(pane = "mapPane")) %>%
+        leaflet::addTiles(
+          urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
+          attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
+          group = "Hillshade",
+          options = leaflet::pathOptions(pane = "mapPane")) %>%
+        leaflet::addTiles(
+          urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mblbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
+          attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
+          group = "Cities",
+          options = leaflet::pathOptions(pane = "overlayPane")) %>%
+        addBGCTiles() %>%
+        leaflet::addLayersControl(
+          baseGroups = c("Hillshade","Positron","Satellite", "OpenStreetMap"),
+          overlayGroups = c("BGCs","Pests","Districts","Cities"),
+          position = "topright") %>%
+        addLegend(position = "bottomright",
+                  labels = c("Unspecified","Low","Moderate","High","Outside Range"),
+                  colors = c("#443e3d","#0CC200","#FFEF01","#D80000","#840090"),
+                  title = "Hazard",
+                  layerId = "bec_fh")
+    })
+    
+  }
 })
 
 prepDatFH <- reactive({
@@ -69,10 +74,21 @@ prepDatFH <- reactive({
   
 })
 
-observeEvent({c(input$pestSpp,input$submitFH,input$submitFHLong)},{
-  dat <- dbGetQuery(sppDb,paste0("select bgc,hazard_update from forhealth where treecode like '",
-                               substr(input$fhSpp,1,2),"' and pest = '",input$pestSpp,
-                               "' and hazard_update <> 'UN'"))
+
+observeEvent({c(input$pestSpp,input$submitFH,input$submitFHLong,input$fh_region)},{
+  if(input$fh_region == "BC"){
+    print("Getting BC")
+    q1 <- paste0("select bgc,hazard_update from forhealth where treecode like '",
+                 substr(input$fhSpp,1,2),"' and pest = '",input$pestSpp,
+                 "' and hazard_update <> 'UN' and region = 'BC'")
+    dat <- dbGetQuery(sppDb,q1)
+  }else{
+    print("getting WNA")
+    q1 <- paste0("select bgc,hazard_update from forhealth where treecode like '",
+                 substr(input$fhSpp,1,2),"' and pest = '",input$pestSpp,
+                 "' and hazard_update <> 'UN'")
+    dat <- dbGetQuery(sppDb,q1)
+  }
   dat <- as.data.table(dat)
   #browser()
   if(nrow(dat) > 0){
@@ -114,9 +130,15 @@ observeEvent(input$fh_click,{
   })
 })
 
-observeEvent({c(input$fh_click,input$fhSpp,input$pestSpp,input$submitFHLong)},{
-  dat1 <- dbGetQuery(sppDb,paste0("select treecode, pest, pest_name, bgc, hazard, hazard_update 
-                                          from forhealth where bgc = '",input$fh_click,"'"))
+observeEvent({c(input$fh_click,input$fhSpp,input$pestSpp,input$submitFHLong,input$fh_region)},{
+  if(input$fh_region == "BC"){
+    q1 <- paste0("select treecode, pest, pest_name, bgc, hazard, hazard_update 
+                                          from forhealth where bgc = '",input$fh_click,"' and region = 'BC'")
+  }else{
+    q1 <- paste0("select treecode, pest, pest_name, bgc, hazard, hazard_update 
+                                          from forhealth where bgc = '",input$fh_click,"'")
+  }
+  dat1 <- dbGetQuery(sppDb,q1)
   dat <- as.data.table(dat1)
   if(nrow(dat) < 1){
     dat <- data.table()
@@ -161,9 +183,16 @@ observeEvent({c(input$fh_click,input$fhSpp,input$pestSpp,input$submitFHLong)},{
 })
 
 observeEvent({c(input$pestSpp,
-                input$fhSpp)},{
-                  dat <- dbGetQuery(sppDb,paste0("select distinct bgc, hazard, hazard_update from forhealth where treecode = '",
-                                               substr(input$fhSpp,1,2),"' and pest = '",input$pestSpp,"'"))
+                input$fhSpp,
+                input$fh_region)},{
+                  if(input$fh_region == "BC"){
+                    q1 <- paste0("select distinct bgc, hazard, hazard_update from forhealth where treecode = '",
+                                 substr(input$fhSpp,1,2),"' and pest = '",input$pestSpp,"' and region = 'BC'")
+                  }else{
+                    q1 <- paste0("select distinct bgc, hazard, hazard_update from forhealth where treecode = '",
+                                 substr(input$fhSpp,1,2),"' and pest = '",input$pestSpp,"'")
+                  }
+                  dat <- dbGetQuery(sppDb,q1)
                   if(nrow(dat) > 0){
                     output$fh_hot_long <- renderRHandsontable({
                       rhandsontable(dat) %>%

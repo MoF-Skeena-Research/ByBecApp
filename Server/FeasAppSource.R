@@ -1,9 +1,9 @@
 ## Source at start of FeasibilityApp
 ## Kiri Daust
 
-bgc_tileserver <- "http://159.203.20.90/data/WNA_MAP/{z}/{x}/{y}.pbf"
+bgc_tileserver <- "https://tileserver.thebeczone.ca/data/WNA_MAP/{z}/{x}/{y}.pbf"
 bgc_tilelayer <- "WNA_MAP"
-district_tileserver <- "http://159.203.20.90/data/Districts/{z}/{x}/{y}.pbf"
+district_tileserver <- "https://tileserver.thebeczone.ca/data/Districts/{z}/{x}/{y}.pbf"
 district_tilelayer <- "Districts"
 
 plugins <- {list(vgplugin = 

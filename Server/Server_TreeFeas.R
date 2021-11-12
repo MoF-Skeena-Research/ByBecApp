@@ -23,7 +23,7 @@ observe({
 ##this is the column name in the database
 observeEvent(input$updatedfeas,{
   print("Updating feasibility")
-  if(input$updatedfeas){
+  if(!input$updatedfeas){
     globalFeas$dat <- "newfeas"
   }else{
     globalFeas$dat <- "feasible"
@@ -143,7 +143,7 @@ prepDatSimple <- reactive({
                 "' and ",globalFeas$dat," in (1,2,3,4,5)")
   d1 <- dbGetQuery(sppDb, QRY)
   if(nrow(d1) == 0){
-    shinyalert(title = "Oops!",text = "There are no data for that species",
+    shinyalert(title = "Oopsie doopsie!",text = "There are no data for that species",
                type = "error",showConfirmButton = T)
     QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
                   " from feasorig where spp = 'Sx' and ",globalFeas$dat," in (1,2,3,4,5)")
@@ -155,44 +155,69 @@ prepDatSimple <- reactive({
   if(input$showFreq){
     feasMax <- prepFreq()
     sppOpts <- unique(feasMax$sppsplit)
-    feasMax[,sppsplit := as.numeric(as.factor(sppsplit))]
-    feasMax[taxaFreqCols, Col := i.Col, on = c("sppsplit","Freq")]
+    feasMax[,sppsplit2 := as.numeric(as.factor(sppsplit))]
+    feasMax[taxaFreqCols, Col := i.Col, on = c(sppsplit2 = "sppsplit","Freq")]
     feasMax[Freq == "Added",Col := "#fbff00ff"]
     feasMax[Freq == "Removed",Col := "#8300ffff"]
-    PALeg <- list(
-      labels = c(sppOpts,"Added","Removed"),
-      colours = c(taxaCols[1:length(sppOpts)],"#fbff00ff","#8300ffff"),
-      title = "Presence/Absence"
-    )
-    globalLeg$Legend <- PALeg
+    temp <- sort(unique(feasMax$sppsplit))
+    #tempTab <- data.table(sppsplit = temp, Col = taxaCols[1:length(temp)])
+    if(input$showadd){
+      PALeg <- list(
+        labels = c(paste(rep(temp,each = 3),
+                          rep(c("Very Frequent","Frequent","Infrequent"),
+                              length(temp)),sep = ": "),"Added","Removed"),
+        colours = c(taxaFreqCols$Col[1:(length(temp)*3)],"#fbff00ff","#8300ffff"),
+        title = "Presence/Absence"
+      )
+    }else{
+      PALeg <- list(
+        labels = c(paste(rep(temp,each = 3),
+                         rep(c("Very Frequent","Frequent","Infrequent"),
+                             length(temp)),sep = ": ")),
+        colours = c(taxaFreqCols$Col[1:(length(temp)*3)]),
+        title = "Presence/Absence"
+      )
+    }
   }else{
     if(length(unique(feasMax$sppsplit)) > 1){
       temp <- unique(feasMax$sppsplit)
       tempTab <- data.table(sppsplit = temp, Col = taxaCols[1:length(temp)])
       feasMax[tempTab,Col := i.Col, on = "sppsplit"]
       temp <- unique(feasMax[,.(sppsplit,Col)])
+      if(input$showadd){
+        feasMax[SuitMax == 4,Col := "#fbff00ff"]
+        feasMax[SuitMax == 5,Col := "#8300ffff"]
+      }else{
+        feasMax <- feasMax[!SuitMax %in% c(4,5),]
+      }
       
+    }else{
+      temp <- unique(feasMax$sppsplit)
+      tempTab <- data.table(sppsplit = temp, Col = taxaCols[1])
+      feasMax[,Col := tempTab$Col[1]]
+      if(input$showadd){
+        feasMax[SuitMax == 4,Col := "#fbff00ff"]
+        feasMax[SuitMax == 5,Col := "#8300ffff"]
+      }else{
+        feasMax <- feasMax[!SuitMax %in% c(4,5),]
+      }
+    }
+    if(input$showadd){
       PALeg <- list(
         labels = c(tempTab$sppsplit,"Added","Removed"),
         colours = c(tempTab$Col,"#fbff00ff","#8300ffff"),
         title = "Presence/Absence"
       )
-      globalLeg$Legend <- PALeg
-      
-      feasMax[SuitMax == 4,Col := "#fbff00ff"]
-      feasMax[SuitMax == 5,Col := "#8300ffff"]
     }else{
-      feasMax[,Col := "#443e3dFF"]
-      feasMax[SuitMax == 4,Col := "#fbff00ff"]
-      feasMax[SuitMax == 5,Col := "#8300ffff"]
       PALeg <- list(
-        labels = c(input$sppPick,"Added","Removed"),
-        colours = c("#443e3dFF","#fbff00ff","#8300ffff"),
+        labels = c(tempTab$sppsplit),
+        colours = c(tempTab$Col),
         title = "Presence/Absence"
       )
-      globalLeg$Legend <- PALeg
     }
   }
+  
+  globalLeg$Legend <- PALeg
   feasMax[,Lab := bgc]
   feasMax[,.(bgc,Col,Lab)]
 })
@@ -204,43 +229,24 @@ prepFreq <- reactive({
                 "' and ",globalFeas$dat," in (1,2,3,4,5)")
   feas <- as.data.table(dbGetQuery(sppDb, QRY))
   setnames(feas, old = globalFeas$dat, new = "feasible")
-  minDist <- feas[,.SD[feasible == min(feasible, na.rm = T)],by = .(bgc,sppsplit)]
-  tf2 <- minDist[feasible %in% c(4,5),]
-  minDist <- minDist[feasible %in% c(1,2,3),]
-  abUnits <- minDist[grep("[[:alpha:]] */[[:alpha:]]+$",ss_nospace),]
-  noAb <- minDist[!grepl("[[:alpha:]] */[[:alpha:]]+$",ss_nospace),]
-  abUnits <- eda[abUnits, on = "ss_nospace"] ##merge
-  abUnits <- abUnits[,.(Temp = if(any(grepl("C4",edatopic))) paste0(ss_nospace,"_01") else ss_nospace, feasible = feasible[1]),
-                     by = .(bgc,ss_nospace,sppsplit,spp)]
-  abUnits[,ss_nospace := NULL]
-  setnames(abUnits,old = "Temp",new = "ss_nospace")
-  minDist <- rbind(noAb,abUnits)
-  minDist[,ID := if(any(grepl("01", ss_nospace)) & feasible[1] == 1) T else F, by = .(bgc,sppsplit)]
-  minDist[,Freq := NA_character_]
-  minDist[(ID),Freq := "High"]
+  edaTemp <- eda[ss_nospace %in% feas$ss_nospace,.(ss_nospace,smr)]
+  edaTemp <- edaTemp[,.(smr = mean(smr)), by = .(ss_nospace)]
+  edaTemp[,smr := as.integer(round(smr))]
+  feasAdd <- feas[!feasible %in% c(1,2,3),]
+  feas <- feas[feasible %in% c(1,2,3),]
+  feas[edaTemp,SMR := i.smr, on = "ss_nospace"]
+  feas[freq_rules,Freq := i.FreqCode, on = c(feasible = "Feasible","SMR")]
+  feas <- feas[,.(Freq = max(Freq,na.rm = T)), by = .(bgc,sppsplit)]
+  feas[,Freq := as.character(Freq)]
+  allFreq <- feas
   
-  minDist2 <- minDist[ID == F,]
-  minDist2[,ID := if(any(grepl("01", ss_nospace))) T else F, by = .(bgc,sppsplit)]
-  minDist2[(ID),Freq := "Moderate"]
-  
-  minDist3 <- minDist2[ID == F,]
-  minEda <- eda[minDist3, on = "ss_nospace"]
-  minEda <- minEda[,.(AvgEda = mean(smr)), by = .(bgc,sppsplit,ss_nospace,feasible)]
-  minEda[,CentEda := abs(AvgEda - 3.5)]
-  minEda <- minEda[,.SD[CentEda == min(CentEda, na.rm = T)], by = .(bgc,sppsplit)]
-  lookupTab <- data.table(AvgEda = c(0,2,5,7),Freq = c("Low","Moderate","Low","Low"))
-  temp <- lookupTab[minEda, on = "AvgEda", roll = T]
-  
-  t1 <- minDist[!is.na(Freq),.(Freq = Freq[1]), by = .(bgc,sppsplit)]
-  t2 <- minDist2[!is.na(Freq),.(Freq = Freq[1]), by = .(bgc,sppsplit)]
-  t3 <- temp[,.(Freq = Freq[1]), by = .(bgc,sppsplit)]
-  allFreq <- rbind(t1,t2,t3)
-  
-  if(nrow(tf2) > 0){
-    tf2[feasible == 4,Freq := "Added"]
-    tf2[feasible == 5,Freq := "Removed"]
-    tf2 <- tf2[,.(Freq = Freq[1]), by = .(bgc,sppsplit)]
-    allFreq <- rbind(allFreq, tf2)
+  if(nrow(feasAdd) > 0 & input$showadd){
+    feasAdd <- feasAdd[,.(feasible = feasible[1]), by = .(bgc,sppsplit)]
+    feasAdd[,Freq := NA_character_]
+    feasAdd[feasible == 4,Freq := "Added"]
+    feasAdd[feasible == 5,Freq := "Removed"]
+    feasAdd[,feasible := NULL]
+    allFreq <- rbind(allFreq, feasAdd)
   }
   allFreq
 })
@@ -263,7 +269,7 @@ prepEdaDat <- reactive({
   feasSub[,Lab := paste0(ss_nospace,": ", feasible)]
   feasSum <- feasSub[,.(FeasVal = mean(feasible), Lab = paste(Lab, collapse = "<br>")), by = bgc]
   #tempCol <- grRamp(rescale(feasSum$FeasVal,to = c(0,1)))
-  feasSum[,Col := colour_values(rescale(feasSum$FeasVal,to = c(0,1)))]
+  feasSum[,Col := colour_values(-1*rescale(feasSum$FeasVal,to = c(0,1)),palette = "viridis")]
   feasSum[,.(bgc,Col,Lab)]
 })
 
@@ -272,7 +278,8 @@ observeEvent({c(
   input$sppPick,
   input$edaplot_selected,
   input$updatedfeas,
-  input$showFreq)
+  input$showFreq,
+  input$showadd)
 },{
   if(input$sppPick == "None"){
     session$sendCustomMessage("clearLayer","xxx")
@@ -290,13 +297,25 @@ observeEvent({c(
       dat <- dat[subzTransparent, on = "bgc"]
       dat[is.na(Col),Col := Transparent]
       dat[is.na(Lab),Lab := bgc]
-      leafletProxy("map") %>%
-        invokeMethod(data = dat, method = "addGridTiles", ~bgc, ~Col, ~Lab) %>%
-        addLegend(position = "bottomright",
-                  labels = globalLeg$Legend$labels,
-                  colors = globalLeg$Legend$colours,
-                  title = globalLeg$Legend$title,
-                  layerId = "bec_feas") 
+        
+      if(is.null(input$edaplot_selected)){
+        leafletProxy("map") %>%
+          invokeMethod(data = dat, method = "addGridTiles", ~bgc, ~Col, ~Lab) %>%
+          addLegend(position = "bottomright",
+                    labels = globalLeg$Legend$labels,
+                    colors = globalLeg$Legend$colours,
+                    title = globalLeg$Legend$title,
+                    layerId = "bec_feas") 
+      }else{
+        pal <- colorNumeric("viridis",c(1,4),reverse = T)
+        leafletProxy("map") %>%
+          invokeMethod(data = dat, method = "addGridTiles", ~bgc, ~Col, ~Lab) %>%
+          addLegend("bottomright", pal = pal, values = c(1,2,3,4),
+                    title = "Mean Feasibility",
+                    opacity = 1,
+                    layerId = "bec_feas"
+          )
+      }
     }
   }
 }, priority = 15)
@@ -337,7 +356,7 @@ prepTable <- reactive({
     dat <- feas[ss_nospace %in% edaSub$ss_nospace & feasible %in% c(1,2,3,4),]
     tabOut <- data.table::dcast(dat, ss_nospace ~ sppsplit, value.var = "feasible", fun.aggregate = mean)
     tabOut[,lapply(.SD,as.integer),.SDcols = -"ss_nospace"]
-    if(input$updatedfeas){
+    if(!input$updatedfeas){
       QRY <- paste0("select ss_nospace,sppsplit,feasible from feasorig where bgc = '",
                     unit,"' and feasible in (1,2,3,4)")
       feasOrig <- as.data.table(dbGetQuery(sppDb, QRY))
