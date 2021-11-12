@@ -178,7 +178,27 @@ observeEvent(input$byZone,{
   toggleElement(id = "sz.choose",condition = input$byZone != "Zone")
 })
 
-observe({
+observeEvent(input$includeWNA,{
+  if(input$includeWNA == "Yes"){
+    znChoose <- zones
+  }else{
+    znChoose <- zonesBC
+  }
+  updatePickerInput(session,"BGCZone.choose",choices = znChoose)
+})
+
+observeEvent(input$BGCZone.choose,{
+  if(input$byZone != "Zone"){
+    getInputDat()
+    t1 <- paste(input$BGCZone.choose, collapse = "|")
+    tempChoose <- climsumInputs$BGC.chooseBC
+    if(input$includeWNA == "Yes"){tempChoose <- climsumInputs$BGC.choose}
+    szChoose <- tempChoose[grep(t1,tempChoose)]
+    updatePickerInput(session,"sz.choose", choices = szChoose, selected = szChoose[1])
+  }
+})
+
+observeEvent(input$tabs,{
   if(input$tabs == "tab5"){
     #browser()
     getInputDat()
@@ -188,13 +208,6 @@ observe({
       znChoose <- zonesBC
     }
     updatePickerInput(session,"BGCZone.choose",choices = znChoose,selected = "SBS")
-    if(input$byZone != "Zone"){
-      t1 <- paste(input$BGCZone.choose, collapse = "|")
-      tempChoose <- climsumInputs$BGC.chooseBC
-      if(input$includeWNA == "Yes"){tempChoose <- climsumInputs$BGC.choose}
-      szChoose <- tempChoose[grep(t1,tempChoose)]
-      updatePickerInput(session,"sz.choose", choices = szChoose, selected = szChoose[1])
-    }
     updatePickerInput(session,"periodTS",choices = climsumInputs$period.ts, 
                       selected = c("1961 - 1990","1991 - 2020"))
     updatePickerInput(session,"periodOther",choices = climsumInputs$period.other,selected = NULL)
