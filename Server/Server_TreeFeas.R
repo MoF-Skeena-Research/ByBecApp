@@ -138,9 +138,13 @@ observeEvent({c(input$showtrees,
 
 ##Prepare BGC colour table for non-edatopic
 prepDatSimple <- reactive({
-  QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
-                " from feasorig where spp = '",substr(input$sppPick,1,2),
-                "' and ",globalFeas$dat," in (1,2,3,4,5)")
+  QRY <- paste0("select bgc,feasorig.ss_nospace,sppsplit,spp,",globalFeas$dat,
+                " FROM feasorig 
+                JOIN special_ss
+                USING (ss_nospace)
+                WHERE special_code IS NULL 
+                AND spp = '",substr(input$sppPick,1,2),
+                "' AND ",globalFeas$dat," in (1,2,3,4,5)")
   d1 <- dbGetQuery(sppDb, QRY)
   if(nrow(d1) == 0){
     shinyalert(title = "Oopsie doopsie!",text = "There are no data for that species",
@@ -224,9 +228,13 @@ prepDatSimple <- reactive({
 
 ##prep frequency colours
 prepFreq <- reactive({
-  QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
-                " from feasorig where spp = '",substr(input$sppPick,1,2),
-                "' and ",globalFeas$dat," in (1,2,3,4,5)")
+  QRY <- paste0("select bgc,feasorig.ss_nospace,sppsplit,spp,",globalFeas$dat,
+                " FROM feasorig 
+                JOIN special_ss
+                USING (ss_nospace)
+                WHERE special_code IS NULL 
+                AND spp = '",substr(input$sppPick,1,2),
+                "' AND ",globalFeas$dat," in (1,2,3,4,5)")
   feas <- as.data.table(dbGetQuery(sppDb, QRY))
   setnames(feas, old = globalFeas$dat, new = "feasible")
   edaTemp <- eda[ss_nospace %in% feas$ss_nospace,.(ss_nospace,smr)]
@@ -253,9 +261,13 @@ prepFreq <- reactive({
 
 ##Prepare BGC colours for edatopic option
 prepEdaDat <- reactive({
-  QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
-                " from feasorig where spp = '",substr(input$sppPick,1,2),
-                "' and ",globalFeas$dat," in (1,2,3,4)")
+  QRY <- paste0("select bgc,feasorig.ss_nospace,sppsplit,spp,",globalFeas$dat,
+                " FROM feasorig 
+                JOIN special_ss
+                USING (ss_nospace)
+                WHERE special_code IS NULL 
+                AND spp = '",substr(input$sppPick,1,2),
+                "' AND ",globalFeas$dat," in (1,2,3)")
   feas <- as.data.table(dbGetQuery(sppDb, QRY))
   setnames(feas, old = globalFeas$dat, new = "feasible")        
   globalLeg$Legend <- edaLeg
@@ -336,8 +348,10 @@ prepTable <- reactive({
   print(unit)
   idx_row <- NULL
   idx_col <- NULL
-  QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
-                " from feasorig where bgc = '",unit,"' and ",globalFeas$dat," in (1,2,3,4)")
+  QRY <- paste0("select bgc,feasorig.ss_nospace,special_code, sppsplit,spp,",globalFeas$dat,
+                " from feasorig JOIN special_ss
+                USING (ss_nospace) 
+                where bgc = '",unit,"' and ",globalFeas$dat," in (1,2,3,4)")
   feas <- as.data.table(dbGetQuery(sppDb, QRY))
   if(nrow(feas) == 0){
     shinyalert("Oopsies!","There are no species in that subzone :(")
@@ -346,7 +360,7 @@ prepTable <- reactive({
   setnames(feas, old = globalFeas$dat, new = "feasible")   
   if(is.null(input$edaplot_selected)){
     feasSub <- feas[sppsplit != "X",]
-    tabOut <- data.table::dcast(feasSub, ss_nospace ~ sppsplit,fun.aggregate = mean, value.var = "feasible")
+    tabOut <- data.table::dcast(feasSub, ss_nospace + special_code ~ sppsplit,fun.aggregate = mean, value.var = "feasible")
     tabOut[,lapply(.SD,as.integer),.SDcols = -"ss_nospace"]
   }else{
     id <- as.numeric(input$edaplot_selected)
@@ -354,8 +368,8 @@ prepTable <- reactive({
     edaSub <- eda[idSub, on = "edatopic"]
     edaSub <- edaSub[bgc == unit,]
     dat <- feas[ss_nospace %in% edaSub$ss_nospace & feasible %in% c(1,2,3,4),]
-    tabOut <- data.table::dcast(dat, ss_nospace ~ sppsplit, value.var = "feasible", fun.aggregate = mean)
-    tabOut[,lapply(.SD,as.integer),.SDcols = -"ss_nospace"]
+    tabOut <- data.table::dcast(dat, ss_nospace + special_code ~ sppsplit, value.var = "feasible", fun.aggregate = mean)
+    tabOut[,lapply(.SD,as.integer),.SDcols = -c("ss_nospace","special_code")]
     if(!input$updatedfeas){
       QRY <- paste0("select ss_nospace,sppsplit,feasible from feasorig where bgc = '",
                     unit,"' and feasible in (1,2,3,4)")

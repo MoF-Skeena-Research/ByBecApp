@@ -84,6 +84,14 @@ treesf <- st_as_sf(treeLocs,coords = c("long", "lat"),
                    crs = 4326)
 st_write(treesf,con,"plotdata")
 
+data <- fread("~/CommonTables/WNA_SSeries_v12_6.csv")
+data <- data[,.(SS_NoSpace,SpecialCode,Special)]
+data[SpecialCode == "",SpecialCode := NA]
+data[Special == "",Special := NA]
+setnames(data,c("ss_nospace","special_code","special_name"))
+dbWriteTable(con,"special_ss",data, row.names = F)
+dbExecute(con,"create index on special_ss(special_code)")
+
 ###plot data
 bcPlots <- fread("TreeSpp.csv")
 
