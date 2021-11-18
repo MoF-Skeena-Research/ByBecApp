@@ -452,6 +452,19 @@ observeEvent(input$submitdat,{
 ##compile and send updates to database
 sendToDb <- function(nme){
   dat <- as.data.table(hot_to_r(input$hot))
+  ss_sp <- unique(dat[!is.na(special_code),.(ss_nospace,special_code)])
+  if(nrow(ss_sp) > 0){
+    ss_sp[,comb := paste0("('",ss_nospace,"','",special_code,"')")]
+    val <- paste(ss_sp$comb,collapse = ",")
+    qry <- paste0("
+                  UPDATE special_ss
+                  SET special_code = v.sc
+                  FROM (values ",val,") AS v(ss,sc)
+                  WHERE special_ss.ss_nospace = v.ss
+                  ")
+    dbExecute(sppDb,qry)
+  }
+  dat[,special_code := NULL]
   unit <- globalSelBEC()
   QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
                 " from feasorig where bgc = '",unit,"' and ",globalFeas$dat," in (1,2,3,4)")
