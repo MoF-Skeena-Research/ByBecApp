@@ -453,7 +453,7 @@ observeEvent(input$submitdat,{
 sendToDb <- function(nme){
   dat <- as.data.table(hot_to_r(input$hot))
   unit <- globalSelBEC()
-  QRY <- paste0("select fid,bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
+  QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
                 " from feasorig where bgc = '",unit,"' and ",globalFeas$dat," in (1,2,3,4)")
   datOrig <- as.data.table(dbGetQuery(sppDb, QRY))
   setnames(datOrig,old = globalFeas$dat, new = "feasible")
@@ -462,7 +462,7 @@ sendToDb <- function(nme){
   dat2[is.na(feasible),feasible := -1]
   dat2 <- dat2[newfeas != feasible,]
   dat2[,mod := nme]
-  datAudit <- dat2[,.(fid,ss_nospace,sppsplit,newfeas,mod)]
+  datAudit <- dat2[,.(ss_nospace,sppsplit,newfeas,mod)]
   datAudit[,date := Sys.Date()]
   dbWriteTable(sppDb,"feas_audit", datAudit, append = T, row.names = F)
   datNew <- dat2[is.na(bgc),]
