@@ -6,19 +6,37 @@ observeEvent(input$showinstr_forhealth,{
 
 observeEvent(input$fhSpp,{
   treeSpp <- substr(input$fhSpp,1,2)
-  dat <- dbGetQuery(sppDb,paste0("select distinct pest,pest_name from forhealth where treecode like '",treeSpp,"'"))
+  dat <- setDT(dbGetQuery(sppDb,paste0("select distinct forhealth.pest,pest_name,common_name 
+                                 from forhealth 
+                                 join pest_names 
+                                 on (forhealth.pest = pest_names.pest) 
+                                 where treecode like '",treeSpp,"'")))
+  ##browser()
   if(nrow(dat) == 0){
-    updateSelectInput(session, "pestSpp", choices = "")
+    updatePickerInput(session, "pestSpp", choices = "")
   }else{
     dat$pest_name <- paste0(dat$pest," - ", dat$pest_name)
-    temp <- dat$pest
-    names(temp) <- dat$pest_name
+    ##names(dat$pest) <- dat$pest_name
     pList <- list()
-    for(pcat in pestCat$pest){
-      pList[[pcat]] <- temp[temp %in% pestCat[pest == pcat,pest_code]]
+    comNms <- c('','')
+    for(pcat in unique(pestCat$pest)){
+      sub <- dat[pest %in% pestCat[pest == pcat,pest_code],]
+      t1 <- sub$pest
+      names(t1) <- sub$pest_name
+      pList[[pcat]] <- t1
+      comNms <- append(comNms, sub$common_name)
+      if(nrow(sub) > 0){
+        comNms <- append(comNms, c("",""))
+      }
     }
-    pList[["Other"]] <- temp[!temp %in% pestCat$pest_code]
-    updateSelectInput(session, "pestSpp", choices = pList)
+    sub <- dat[!pest %in% pestCat$pest_code,]
+    t1 <- sub$pest
+    names(t1) <- sub$pest_name
+    comNms <- append(comNms, sub$common_name)
+    pList[["Other"]] <- t1
+    print(comNms)
+    updatePickerInput(session, "pestSpp", choices = pList)
+    onclick("pestSpp", js$selectInput_tooltips("pestSpp",comNms))
   }
 })
 

@@ -1,6 +1,22 @@
 library(data.table)
 library(RPostgreSQL)
 pest <- fread("Mod_Pest_Orig.csv")
+pestNm <- unique(pest[,.(`PEST - COMMON NAME`,`PEST CODE`)])
+setnames(pestNm,c("common_name","pest"))
+
+pest <- fread("Low_Pest_Orig.csv")
+pestNm2 <- unique(pest[,.(`PEST - COMMON NAME`,`PEST CODE`)])
+setnames(pestNm2,c("common_name","pest"))
+
+pest <- fread("Pest_High_Hazard.csv")
+pestNm3 <- unique(pest[,.(`PEST - COMMON NAME`,`CODE`)])
+setnames(pestNm3,c("common_name","pest"))
+
+allNms <- unique(rbind(pestNm,pestNm2,pestNm3))
+dbExecute(con,"drop table pest_names")
+dbWriteTable(con, "pest_names",allNms, row.names = F)
+dbExecute(con,"create index on pest_names(pest)")
+
 pest <- pest[,.(`HOST - COMMON NAME`,`PEST CODE`, `PEST - SCIENTIFIC NAME`,ZONE,SUBZONE,VARIANT)]
 pest[,VARIANT := as.character(VARIANT)]
 pest[is.na(VARIANT),VARIANT := ""]

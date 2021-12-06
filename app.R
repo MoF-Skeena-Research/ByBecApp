@@ -123,12 +123,32 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                              )
                     ),
                     tabPanel(value = "tab3",title = "Forest Health",
+                             useShinyjs(),
+                             extendShinyjs(text = '
+                                  shinyjs.selectInput_tooltips = function(params){
+                                  var defaultParams = {
+                                    id : null,
+                                    tooltips : null
+                                  };
+                                  params = shinyjs.getParams(params, defaultParams);
+                        
+                                  var selectInput = $("#"+params.id).closest("div").find(".dropdown-menu").get(1);
+                                  var element_selectInput = selectInput.childNodes;
+                        
+                                  if(element_selectInput.length >0 && element_selectInput[0].title == ""){ // to be trigger only once
+                                    for(var i = 0; i < element_selectInput.length; i++){
+                                      element_selectInput[i].title = params.tooltips[i];
+                                    }
+                                  }
+                                }; 
+                              ',
+                                           functions = "selectInput_tooltips"),
                              column(3,
                                     h2("Hazard Rating by Tree and Pest"),
                                     selectInput("fhSpp",
                                                 label = "Select Host Species",
                                                 choices = c("None",sppList)),
-                                    selectInput("pestSpp",
+                                    pickerInput("pestSpp",
                                                 label = "Select Pest",
                                                 choices = c("DRN","DRL","IDW"),
                                                 multiple = F),
