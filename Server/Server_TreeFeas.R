@@ -279,9 +279,8 @@ prepEdaDat <- reactive({
     return(NULL)
   }
   feasSub[,Lab := paste0(ss_nospace,": ", feasible)]
-  feasSum <- feasSub[,.(FeasVal = mean(feasible), Lab = paste(Lab, collapse = "<br>")), by = bgc]
-  #tempCol <- grRamp(rescale(feasSum$FeasVal,to = c(0,1)))
-  feasSum[,Col := colour_values(-1*rescale(feasSum$FeasVal,to = c(0,1)),palette = "viridis")]
+  feasSum <- feasSub[,.(FeasVal = round(mean(feasible)/0.5)*0.5, Lab = paste(Lab, collapse = "<br>")), by = bgc]
+  feasSum[edaFreqCols,Col := i.Col, on = "FeasVal"]
   feasSum[,.(bgc,Col,Lab)]
 })
 
@@ -310,24 +309,13 @@ observeEvent({c(
       dat[is.na(Col),Col := Transparent]
       dat[is.na(Lab),Lab := bgc]
         
-      if(is.null(input$edaplot_selected)){
-        leafletProxy("map") %>%
-          invokeMethod(data = dat, method = "addGridTiles", ~bgc, ~Col, ~Lab) %>%
-          addLegend(position = "bottomright",
-                    labels = globalLeg$Legend$labels,
-                    colors = globalLeg$Legend$colours,
-                    title = globalLeg$Legend$title,
-                    layerId = "bec_feas") 
-      }else{
-        pal <- colorNumeric("viridis",c(1,4),reverse = T)
-        leafletProxy("map") %>%
-          invokeMethod(data = dat, method = "addGridTiles", ~bgc, ~Col, ~Lab) %>%
-          addLegend("bottomright", pal = pal, values = c(1,2,3,4),
-                    title = "Mean Feasibility",
-                    opacity = 1,
-                    layerId = "bec_feas"
-          )
-      }
+      leafletProxy("map") %>%
+        invokeMethod(data = dat, method = "addGridTiles", ~bgc, ~Col, ~Lab) %>%
+        addLegend(position = "bottomright",
+                  labels = globalLeg$Legend$labels,
+                  colors = globalLeg$Legend$colours,
+                  title = globalLeg$Legend$title,
+                  layerId = "bec_feas") 
     }
   }
 }, priority = 15)

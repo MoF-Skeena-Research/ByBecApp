@@ -62,8 +62,9 @@ idDat <- as.data.table(idDat)
 setorder(idDat,SMR,SNR)
 idDat[,ID := c(5,5,10,15,15,4,4,9,14,14,4,4,9,14,14,3,3,8,13,13,3,3,8,13,13,2,2,7,12,12,2,2,7,12,12,1,1,6,11,11)]
 idDat[,edatopic := paste0(SNR,SMR)]
-edaMaxCol <- "#440154FF"
-edaMinCol <- "#FDE725FF"
+
+edaFreqCols <- data.table(FeasVal = rev(seq(4,1,by = -0.5)), 
+                          Col = rev(c('#40004b','#40004b','#762a83','#9970ab','#5aae61','#1b7837','#00441b')))
 assCols <- data.table(ID = c(1,2,3,4,5,0), 
                       Col = c("#E20000","#FF7B00","#FFEC00","#91FB00","#1DB000","#631758"))
 assID <- data.table(assessment = c("Fail","Poor","Fair","Good","Excellent","UN"),
@@ -136,8 +137,8 @@ climaticLeg <- list(
 )
 
 edaLeg <- list(
-  labels = c("Poor Feasibility","Good Feasibility"),
-  colours = c(edaMinCol,edaMaxCol),
+  labels = edaFreqCols$FeasVal,
+  colours = edaFreqCols$Col,
   title = "Edatopic Feasibility"
 )
 
