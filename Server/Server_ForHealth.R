@@ -4,6 +4,23 @@ observeEvent(input$showinstr_forhealth,{
   shinyalert(title = "Instructions",html = T,text = instr_forhealth)
 })
 
+observeEvent(input$downloadFH,{
+  showModal(modalDialog(
+    selectInput("downloadPest","Select Pest",choices = pestOps,multiple = F),
+    downloadButton("downloadPestButton")
+  ))
+})
+
+output$downloadPestButton <- downloadHandler(
+  filename = paste0("ForestHealth_Download.csv"),
+  content = function(file){
+    dat <- dbGetQuery(sppDb,paste0("SELECT * from forhealth WHERE pest = '",
+                                   input$downloadPest,"' AND region = 'BC'"))
+    dat <- as.data.table(dat)
+    fwrite(dat, file)
+  }
+)
+
 observeEvent(input$fhSpp,{
   treeSpp <- substr(input$fhSpp,1,2)
   dat <- setDT(dbGetQuery(sppDb,paste0("select distinct forhealth.pest,pest_name,common_name 
@@ -17,6 +34,7 @@ observeEvent(input$fhSpp,{
   }else{
     dat$pest_name <- paste0(dat$pest," - ", dat$pest_name)
     ##names(dat$pest) <- dat$pest_name
+    ##browser()
     pList <- list()
     comNms <- c('','')
     for(pcat in unique(pestCat$pest)){

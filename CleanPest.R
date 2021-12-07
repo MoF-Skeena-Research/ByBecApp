@@ -122,6 +122,9 @@ allDat[,hazard_update := hazard]
 allDat[,mod := NA]
 fwrite(allDat,"PestForDB.csv")
 
+
+
+
 ##update forhealth table
 drv <- dbDriver("PostgreSQL")
 sapply(dbListConnections(drv), dbDisconnect)
@@ -131,6 +134,9 @@ highPest <- dbGetQuery(con, "select * from forhealth")
 fwrite(highPest,"ForHealthSave.csv")
 highPest <- old
 highPest <- as.data.table(highPest)
+origFH <- highPest
+newFHMat <- fread("Pest_by_Host_Matrix_Conifer_Dec21.csv")
+
 new_table <- fread("FullListofBGCbyHostbyPest.csv")
 new_table[,c("hazard_update","mod") := NULL]
 setnames(new_table, old = c("hazard","pest_name"), new = c("new_hazard","new_name"))
@@ -176,27 +182,44 @@ setcolorder(pest3,c("pest_code","pest","pest_common","pest_scientific","host_cod
                     "bgc","zone", "subzone","variant","Hazard"))
 fwrite(pest3,"Pest_HighHazard_Clean.csv")
 
+
+##update fh tables from matrix
 ###new pest matrix
-dat1[PEST_SPECIES_LATIN_NAME == "", PEST_SPECIES_LATIN_NAME := PEST_SPECIES_COMMON_NAME]
-dat1 <- dat1[,!c("PEST_TYPE")]
-colnames(dat1)[1:2] <- c("pest","pest_name")
-dat1 <- melt(dat1,id.vars = c("pest","pest_name"),variable.name = "treecode",value.name = "Presence")
+
+origFH <- dbGetQuery()
+newFHMat <- fread("Pest_by_Host_Matrix_Conifer_Dec21.csv")
+newFHMat <- newFHMat[Use == "y",]
+newFHMat <- newFHMat[PEST_SPECIES_CODE != "",]
+colNms <- names(newFHMat)
+colNmsUse <- colNms[c(8,10:26)]
+fhMatSpp <- newFHMat[,..colNmsUse]
+setnames(fhMatSpp, old = c("PEST_SPECIES_CODE","PEST_SPECIES_LATIN_NAME"),
+         new = c("pest","pest_name"))
+
+dat1 <- melt(fhMatSpp,id.vars = c("pest","pest_name"),variable.name = "treecode",value.name = "Presence")
 dat1 <- na.omit(dat1)
 
-dat2[PEST_SPECIES_LATIN_NAME == "", PEST_SPECIES_LATIN_NAME := PEST_SPECIES_COMMON_NAME]
-dat2 <- dat2[,!c("Use","PESTGROUP","PEST_TYPE","PEST_SPECIES_COMMON_NAME")]
-colnames(dat2)[1:2] <- c("pest","pest_name")
-dat2 <- melt(dat2,id.vars = c("pest","pest_name"),variable.name = "treecode",value.name = "Presence")
-dat2 <- na.omit(dat2)
+newFHMat <- fread("Pest_by_Host_Matrix_cleaned_Decid.csv")
+newFHMat <- newFHMat[Use == "y",]
+newFHMat <- newFHMat[PEST_SPECIES_CODE != "",]
+colNms <- names(newFHMat)
+colNmsUse <- colNms[c(8,10:16)]
+fhMatSpp <- newFHMat[,..colNmsUse]
+setnames(fhMatSpp, old = c("PEST_SPECIES_CODE","PEST_SPECIES_LATIN_NAME"),
+         new = c("pest","pest_name"))
+
+dat2 <- melt(fhMatSpp,id.vars = c("pest","pest_name"),variable.name = "treecode",value.name = "Presence")
+dat2 <- na.omit(dat1)
+
 datAll <- rbind(dat1,dat2)
 
 newPests <- unique(datAll$pest)
 allSpp <- as.character(unique(datAll$treecode))
-feas <- fread("~/CommonTables/Feasibility_v12_3.csv")
+feas <- fread("../Work2021/CommonTables/Feasibility_v12_11.csv")
 feas <- feas[Feasible %in% c(1,2,3),]
 feas[,Spp := substr(SppVar, 1,2)]
 feas <- feas[Spp %chin% allSpp,]
-feas <- feas[BGC %chin% BGCDat$BGC,]
+#feas <- feas[BGC %chin% BGCDat$BGC,]
 feas <- feas[,.(MF = max(Feasible)), by = .(Spp,SppVar,BGC)]
 feas <- feas[,.(Spp,BGC)]
 
@@ -210,7 +233,46 @@ setnames(new,old = "i.pest_name",new = "pest_name")
 new[is.na(hazard),hazard := "UN"]
 new[,hazard_update := hazard]
 new[,mod := NA]
+bgcDat <- fread("../Work2021/CommonTables/All_BGCs_Info_v12_10.csv")
+new[bgcDat,region := i.DataSet, on = c(bgc = "BGC")]
+new[is.na(region), region := "BC"]
 dbWriteTable(con,"forhealth",new,append = T, row.names = F)
+#####
+###create pestCategory table
+conf <- fread("Pest_by_Host_Matrix_Conifer_Dec21.csv")
+conf <- conf[,.(PESTGROUP,PEST_TYPE,PEST_SPECIES_CODE)]
+setnames(conf, c("pest_type","pest","pest_code"))
+conf <- conf[pest_code != "" & pest != "",]
+
+decid <- fread("Pest_by_Host_Matrix_cleaned_Decid.csv")
+decid <- decid[,.(PESTGROUP,PEST_TYPE,PEST_SPECIES_CODE)]
+setnames(decid, c("pest_type","pest","pest_code"))
+decid <- decid[pest_code != "" & pest != "",]
+
+all <- rbind(conf,decid)
+all <- unique(all)
+setorder(all,pest_type)
+fwrite(all,"./inputs/Pest_Types.csv")
+
+
+##common names
+conf <- fread("Pest_by_Host_Matrix_Conifer_Dec21.csv")
+conf <- conf[,.(PEST_SPECIES_COMMON_NAME,PEST_SPECIES_CODE)]
+setnames(conf, c("common_name","pest"))
+conf <- conf[pest != "",]
+
+decid <- fread("Pest_by_Host_Matrix_cleaned_Decid.csv")
+decid <- decid[,.(PEST_SPECIES_COMMON_NAME,PEST_SPECIES_CODE)]
+setnames(decid, c("common_name","pest"))
+decid <- decid[pest != "",]
+
+all <- rbind(conf,decid)
+all <- unique(all)
+
+dbExecute(con,"drop table pest_names")
+dbWriteTable(con,"pest_names",all, row.names = F)
+dbExecute(con,"create index on pest_names(pest)")
+##############################################################
 
 temp <- fread(file.choose())
 temp <- temp[Use == 'y',.(PESTGROUP, PEST_TYPE,PEST_SPECIES_CODE)]

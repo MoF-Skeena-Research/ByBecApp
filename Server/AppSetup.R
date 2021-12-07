@@ -129,6 +129,7 @@ wetOpt <- data.table(feasible = c(1,2,3), Col = c("#c24f00ff","#cd804bff","#fbbd
 splitOpt <- "#df00a9ff"
 dryOpt <- data.table(feasible = c(1,2,3), Col = c("#000aa3ff","#565edeff","#8b8fdbff"))
 
+pestOps <- dbGetQuery(sppDb,"select distinct pest from forhealth")[,1]
 ##legends
 climaticLeg <- list(
   labels = c("Climatic Optimum","Wet Site Optimum","Dry Site Optimum","Bimodal Feasibility","Off-site Addition","Removed from CFRG"),
