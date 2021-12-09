@@ -22,6 +22,8 @@ source("Server/FeasAppSource.R") ##javascript functions
 # Define UI for application that draws a histogram
 ui <- fluidPage(theme = shinytheme("lumen"),
                 tags$head(HTML("<title>Power of BEC</title>")),
+                tags$script(src = "https://unpkg.com/@popperjs/core@2"),
+                tags$script(src = "https://unpkg.com/tippy.js@6"),
                 fluidRow(style = "background-color: #003366;",
                     column(6,img(src = "images/gov3_bc_logo.png",align = "left")),
                          column(6,h1("The By-BEC Portal",style = "color: white;"))),
@@ -157,7 +159,9 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                     actionButton("downloadFH","Download Data"),
                                     actionButton("showMatrix","Show Pest-by-Host Table"),
                                     h3("Hazard By BGC"),
-                                    rHandsontableOutput("fh_hot_long"),
+                                    panel(style = "overflow-y:scroll; max-height: 500px; position:relative; align: centre",
+                                        rHandsontableOutput("fh_hot_long")
+                                    ),
                                     textInput("fhModLong",label = "Enter your initials:"),
                                     actionButton("submitFHLong","Submit Hazard Updates")
                              ),
@@ -171,9 +175,11 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                     span(textOutput("pestDatLabel", inline = T),style= "font-size:22px"),
                                     p("Note: to add a new pest, right-click on the table, select 'add row', and enter 
                                    pest name, code, and hazard ratings."),
-                                    rHandsontableOutput("fh_hot"),
-                                    textInput("fhMod",label = "Enter your initials:"),
-                                    actionButton("submitFH","Submit Hazard Updates")
+                                    #panel(style = "overflow-y:scroll; max-height: 500px; position:relative; align: centre",
+                                        rHandsontableOutput("fh_hot"),
+                                        textInput("fhMod",label = "Enter your initials:"),
+                                        actionButton("submitFH","Submit Hazard Updates")
+                                    #)
                              )
                     ),
                     navbarMenu("Climate Summaries",

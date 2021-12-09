@@ -96,7 +96,7 @@ observeEvent(input$tabs,{
 
 prepDatFH <- reactive({
   QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,feasible from feasorig where spp = '",
-                substr(input$fhSpp,1,2),"' and feasible in (1,2,3,4,5)")
+                substr(input$fhSpp,1,2),"' and feasible in (1,2,3)")
   d1 <- dbGetQuery(sppDb, QRY)
   if(nrow(d1) != 0){
     feas <- as.data.table(d1)
@@ -168,11 +168,13 @@ observeEvent(input$fh_click,{
 
 observeEvent({c(input$fh_click,input$fhSpp,input$pestSpp,input$submitFHLong,input$fh_region)},{
   if(input$fh_region == "BC"){
-    q1 <- paste0("select treecode, pest, pest_name, bgc, hazard, hazard_update 
-                                          from forhealth where bgc = '",input$fh_click,"' and region = 'BC'")
+    q1 <- paste0("select treecode, forhealth.pest, common_name, pest_name, bgc, hazard, hazard_update 
+                                          from forhealth join pest_names on (forhealth.pest = pest_names.pest) 
+                 where bgc = '",input$fh_click,"' and region = 'BC'")
   }else{
-    q1 <- paste0("select treecode, pest, pest_name, bgc, hazard, hazard_update 
-                                          from forhealth where bgc = '",input$fh_click,"'")
+    q1 <- paste0("select treecode, forhealth.pest, common_name, pest_name, bgc, hazard, hazard_update 
+                                          from forhealth join pest_names on (forhealth.pest = pest_names.pest) 
+                 where bgc = '",input$fh_click,"'")
   }
   dat1 <- dbGetQuery(sppDb,q1)
   dat <- as.data.table(dat1)
@@ -181,18 +183,18 @@ observeEvent({c(input$fh_click,input$fhSpp,input$pestSpp,input$submitFHLong,inpu
     col_num <- NULL
     row_num <- NULL
   }else{
-    dat <- dcast(dat, pest_name + pest ~ treecode, value.var = "hazard_update", 
+    dat <- dcast(dat, common_name + pest_name + pest ~ treecode, value.var = "hazard_update", 
                  fun.aggregate = function(x) x[1])
     dat[is.na(dat)] <- "NULL"
-    col_num <- which(colnames(dat) == substr(input$fhSpp,1,2)) - 1
-    row_num <- which(dat$pest == input$pestSpp) - 1
-  }
-  output$fh_hot <- renderRHandsontable({
-    rhandsontable(dat,col_highlight = col_num, 
-                  row_highlight = row_num) %>%
-      hot_cols(type = "dropdown",source = c("Nil","Low","Moderate","High","UN"),
-               renderer = 
-                 "function(instance, td, row, col, prop, value, cellProperties) {
+    col_num <- which(colnames(dat) == substr(input$fhSpp,1,2)) - 3
+    row_num <- which(dat$pest == input$pestSpp) - 3
+    
+    output$fh_hot <- renderRHandsontable({
+      rhandsontable(dat[,!c("common_name","pest_name")],col_highlight = col_num, 
+                    row_highlight = row_num,height = 600)  %>%
+        hot_cols(type = "dropdown",source = c("Nil","Low","Moderate","High","UN"),
+                 renderer = 
+                   "function(instance, td, row, col, prop, value, cellProperties) {
                                         Handsontable.renderers.TextRenderer.apply(this, arguments);
                                       if(instance.params) {
                                         hcols = instance.params.col_highlight
@@ -214,8 +216,19 @@ observeEvent({c(input$fh_click,input$fhSpp,input$pestSpp,input$submitFHLong,inpu
                                           td.style.background = 'yellow';
                                         }
                                       }"
-      )
-  })
+        ) %>% hot_col(1,renderer = paste0("function(instance, td, row, col, prop, value, cellProperties) {
+                              var titleLookup = ['",paste(dat$common_name, collapse = "','"),"'];
+                              //console.log(titleLookup);
+                              if(td.hasOwnProperty('_tippy')) {td._tippy.destroy()}
+                              tippy(td, {
+                                content: titleLookup[row],
+                              });
+                              Handsontable.renderers.TextRenderer.apply(this, arguments);
+                              return (td);
+                            }"))
+    })
+  }
+  
 })
 
 observeEvent({c(input$pestSpp,
