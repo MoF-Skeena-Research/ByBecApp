@@ -19,10 +19,19 @@ browsable(
   )
 )
 
-dat <- fread("C:/Users/kirid/Downloads/ForestHealth_Download (1).csv")
+dat <- fread("ForestHealth_Download.csv")
 pests <- unique(dat$pest)
 dbDat <- dbGetQuery(sppDb,paste0("select * from forhealth where pest IN ('",
                     paste(pests,collapse = "','"),"') and region = 'BC'"))
 dbDat <- as.data.table(dbDat)
 dbDat[dat, new := i.hazard_update, on = c("bgc","treecode","pest")]
 datNew <- dbDat[hazard_update != new,]
+datNew[,mod := "Dragon"]
+datNew[,comb := paste0("('",bgc,"','",treecode,"','",pest,"','",hazard_update,"','",mod,"')")]
+dat <- paste(datNew$comb,collapse = ",")
+dbExecute(sppDb,paste0("UPDATE forhealth
+               SET hazard_update = new.hazard_update,
+               mod = new.mod
+               FROM (values ",dat,") 
+               AS new(bgc,treecode,pest,hazard_update,mod)
+               WHERE (forhealth.bgc = new.bgc AND forhealth.treecode = new.treecode AND forhealth.pest = new.pest)"))

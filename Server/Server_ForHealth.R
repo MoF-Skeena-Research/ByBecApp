@@ -11,6 +11,50 @@ observeEvent(input$downloadFH,{
   ))
 })
 
+observeEvent(input$uploadFH,{
+  showModal(modalDialog(
+    h2("Upload file with updates"),
+    fileInput("file1", "Upload csv in same format as downloadable data. Updates must be in hazard_updates column",
+              accept = c(
+                "text/csv",
+                "text/comma-separated-values,text/plain",
+                ".csv")
+    ),
+    textInput("fhUploadMod","Enter your initials"),
+    actionButton("fhUploadGo","Submit to Database")
+  ))
+})
+
+##update and submit to db
+observeEvent(input$fhUploadGo,{
+  if(!is.null(input$file1)){
+    dat <- fread(input$file1$datapath)
+    pests <- unique(dat$pest)
+    dbDat <- dbGetQuery(sppDb,paste0("select * from forhealth where pest IN ('",
+                                     paste(pests,collapse = "','"),"') and region = 'BC'"))
+    dbDat <- as.data.table(dbDat)
+    dbDat[dat, new := i.hazard_update, on = c("bgc","treecode","pest")]
+    datNew <- dbDat[hazard_update != new,]
+    datNew[,mod := input$fhUploadMod]
+    if(any(!datNew$hazard_update %in% c("Low","Moderate","High","UN"))){
+      shinyalert("Oops!","Hazard values must be Low, Moderate, High, or UN. Please correct the values and resubmit")
+    }else{
+      datNew[,comb := paste0("('",bgc,"','",treecode,"','",pest,"','",new,"','",mod,"')")]
+      dat <- paste(datNew$comb,collapse = ",")
+      ##print(dat)
+      dbExecute(sppDb,paste0("UPDATE forhealth
+               SET hazard_update = new.hazard_update,
+               mod = new.mod
+               FROM (values ",dat,") 
+               AS new(bgc,treecode,pest,hazard_update,mod)
+               WHERE (forhealth.bgc = new.bgc AND forhealth.treecode = new.treecode AND forhealth.pest = new.pest)"))
+      shinyalert("Thank you!","Your updates have been recorded", type = "info",
+                 imageUrl = "images/puppy1.jpg",imageHeight = "100px", inputId = "dbmessagefh")
+    }
+    
+  }
+})
+
 output$downloadPestButton <- downloadHandler(
   filename = paste0("ForestHealth_Download.csv"),
   content = function(file){
