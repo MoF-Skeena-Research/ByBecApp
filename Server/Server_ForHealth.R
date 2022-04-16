@@ -231,7 +231,7 @@ observeEvent({c(input$fh_click,input$fhSpp,input$pestSpp,input$submitFHLong,inpu
                  fun.aggregate = function(x) x[1])
     dat[is.na(dat)] <- "NULL"
     col_num <- which(colnames(dat) == substr(input$fhSpp,1,2)) - 3
-    row_num <- which(dat$pest == input$pestSpp) - 3
+    row_num <- which(dat$pest == input$pestSpp) - 1
     
     output$fh_hot <- renderRHandsontable({
       rhandsontable(dat[,!c("common_name","pest_name")],col_highlight = col_num, 
