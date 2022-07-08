@@ -17,7 +17,8 @@ sppDb <- dbPool(
 # updates <- updates[,.(Region,SS_NoSpace,Spp,`Suitability(refguide)`,`COAST 5Feb+25Feb`,`COAST SEPT 2021`)]
 # setnames(updates,c("region","ss_nospace","spp","OrigFeas","Update1","Update2"))
 
-
+fh <- dbGetQuery(sppDb, "select * from forhealth")
+fwrite(fh, "ForestHealthDownload.csv")
 ##check that it's safe to combine the update columns
 # updates[!is.na(Update1) & !is.na(Update2),]
 # updates[!is.na(Update2),Update1 := Update2]
@@ -41,7 +42,23 @@ fwrite(dbFeas,"feasorig_save.csv")##just incase something goes wrong
 # fwrite(dbFeasNew,"feasorig_save2.csv")##just incase something goes wrong
 # feasNew <- merge(dbFeas,updates, by = c("ss_nospace","spp"), all = T)
 
-feasNew <- fread("feasorig_save2.csv")###read back in an updated csv file
+feasNew <- fread("C:/Users/kirid/Downloads/FeasibilityUpdates_ByBEC.csv")###read back in an updated csv file
+feasNew[,feasible := NULL]
+setnames(feasNew, old = c("newfeas","mod"), new = c("nf_update","mod_update"))
+setnames(feasNew, old = "spp",new = "sppsplit")
+
+check_updates <- merge(dbFeas, feasNew, by = c("bgc","ss_nospace","sppsplit"), all = T)
+temp <- check_updates[newfeas != nf_update,]
+temp <- temp[mod != "",]
+fixed_conflicts <- fread("Conflicting_feas.csv")
+fixed_conflicts <- fixed_conflicts[,.(ss_nospace,sppsplit,use,mod_use)]
+check_updates[newfeas != nf_update,`:=`(newfeas = nf_update, mod = mod_update)]
+check_updates[fixed_conflicts, `:=`(fix_feas = i.use, fix_mod = i.mod_use),
+              on = c("ss_nospace","sppsplit")]
+check_updates[!is.na(fix_feas),`:=`(newfeas = fix_feas,mod = fix_mod)]
+newDat <- check_updates[,.(bgc, ss_nospace, sppsplit, feasible, spp, newfeas, 
+                             mod)]
+newDat[mod == "", mod := NA]
 ##check that none of the updates conflict with previous updates
 # feasNew[!is.na(mod) & !is.na(Update1),]
 ##ok all good
@@ -61,7 +78,7 @@ feasNew <- feasNew[,.(bgc,ss_nospace,sppsplit,feasible,spp,newfeas,mod)] ##make 
 unique(feasNew$mod)
 ##warning! make sure you've saved a copy before dropping table###
 dbExecute(sppDb,"drop table feasorig")
-dbWriteTable(sppDb,"feasorig",feasNew,row.names = F)
+dbWriteTable(sppDb,"feasorig",newDat,row.names = F)
 dbGetQuery(sppDb,"select count(*) from feasorig")
 dbExecute(sppDb,"create index on feasorig (bgc,sppsplit)")
 dbExecute(sppDb,"create index on feasorig (spp)")

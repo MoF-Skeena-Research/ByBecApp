@@ -60,6 +60,51 @@ output$downloadPest <- downloadHandler(
   }
 )
 
+observeEvent(input$sppPick,{
+  output$downloadFeasMap <- downloadHandler(
+    filename = paste0("TheBECZone_Feasibility_",substr(input$sppPick,1,2),".gpkg"),
+    content = function(file){
+      if(is.null(input$edaplot_selected)){
+        Q1 <- paste0("SELECT bgc_simple.bgc, temp.feasible, temp.spp, bgc_simple.geom
+                    FROM bgc_simple
+                    JOIN (SELECT bgc, spp, MIN(newfeas) feasible
+                          FROM feasorig
+                          WHERE spp like '",substr(input$sppPick,1,2),"'
+                          GROUP BY bgc, spp) temp
+                    ON (bgc_simple.bgc = temp.bgc)
+                    WHERE temp.feasible IN (1,2,3)")
+      }else{
+        id <- as.numeric(input$edaplot_selected)
+        idSub <- idDat[ID == id,.(ID,edatopic)]
+        tempval <- paste(idSub$edatopic,collapse = "','")
+        Q1 <- paste0("
+        WITH tempeda(eda) AS
+        (values ('",tempval,"')),
+        siteseries AS (
+          SELECT ss_nospace, edatopic
+          FROM eda
+          JOIN tempeda
+          ON eda.edatopic = tempeda.eda
+        )
+        
+        SELECT bgc_simple.bgc, temp.feasible, temp.spp, bgc_simple.geom
+                    FROM bgc_simple
+                    JOIN (SELECT bgc, spp, AVG(newfeas) feasible
+                          FROM feasorig
+                          JOIN siteseries
+                          ON feasorig.ss_nospace = siteseries.ss_nospace
+                          WHERE spp like '",substr(input$sppPick,1,2),"'
+                          GROUP BY bgc, spp) temp
+                    ON (bgc_simple.bgc = temp.bgc)
+                    WHERE temp.feasible < 3.5")
+      }
+      
+      dat <- st_read(sppDb,query = Q1)
+      st_write(dat,file)
+    }
+  )
+})
+
 ##base BGC map -- done
 output$map <- renderLeaflet({
   leaflet() %>%

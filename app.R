@@ -50,7 +50,8 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                               checkboxGroupInput("showtrees","Show species plots",choices = c("BC","AB","US"),inline = T),
                                               checkboxGroupInput("trials","Show location of offsite trials",c("AMAT","RESULTS"), inline = T),
                                               sliderInput("trialStart","Filter offsite trials by planting date:",
-                                                          min = minStart, max = maxStart, value = c(minStart,maxStart))
+                                                          min = minStart, max = maxStart, value = c(minStart,maxStart)),
+                                              downloadButton("downloadFeasMap",label = "Export Spatial")
                                         )
                                         
                                  ),
@@ -156,8 +157,10 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                                 multiple = F),
                                     radioButtons("fh_region","Show Results for: ", choices = c("BC","WNA"),
                                                  selected = "BC", inline = T),
-                                    actionButton("downloadFH","Download Data"),
-                                    actionButton("uploadFH","Upload Data"),
+                                    splitLayout(actionButton("downloadFH","Download CSV"),
+                                                actionButton("uploadFH","Upload CSV"),
+                                                downloadButton("downloadFHMap","Download Spatial"))
+                                    ,
                                     actionButton("showMatrix","Show Pest-by-Host Table"),
                                     h3("Hazard By BGC"),
                                     panel(style = "overflow-y:scroll; max-height: 500px; position:relative; align: centre",

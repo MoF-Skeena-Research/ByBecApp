@@ -31,9 +31,7 @@ sppDb <- dbPool(
   user = "postgres",
   password = "PowerOfBEC"
 )
-onStop(function() {
-  poolClose(sppDb)
-})
+
 climDb <- dbPool(
   drv = RPostgres::Postgres(),
   dbname = "bgc_climate_data",
@@ -42,8 +40,11 @@ climDb <- dbPool(
   user = "postgres",
   password = "PowerOfBEC"
 )
+
+
 onStop(function() {
   poolClose(climDb)
+  poolClose(sppDb)
 })
 
 subzones_colours_ref <- fread("./inputs/WNA_v12_HexCols.csv")
