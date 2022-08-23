@@ -23,31 +23,36 @@ getInputDat <- function(){
   climsumInputs$futScn <- c("ssp126","ssp245","ssp370","ssp585")
 }
 
-## map interface
-output$climMap <- renderLeaflet({
-  leaflet() %>%
-    setView(lng = -122.77222, lat = 51.2665, zoom = 6) %>%
-    addProviderTiles(leaflet::providers$CartoDB.PositronNoLabels, group = "Positron",
-                     options = leaflet::pathOptions(pane = "mapPane")) %>%
-    leaflet::addProviderTiles(leaflet::providers$Esri.WorldImagery, group = "Satellite",
-                              options = leaflet::pathOptions(pane = "mapPane")) %>%
-    leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap",
-                              options = leaflet::pathOptions(pane = "mapPane")) %>%
-    leaflet::addTiles(
-      urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
-      attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
-      group = "Hillshade",
-      options = leaflet::pathOptions(pane = "mapPane")) %>%
-    leaflet::addTiles(
-      urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mblbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
-      attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
-      group = "Cities",
-      options = leaflet::pathOptions(pane = "overlayPane")) %>%
-    addPlugins() %>%
-    leaflet::addLayersControl(
-      baseGroups = c("Hillshade","Positron","Satellite", "OpenStreetMap"),
-      overlayGroups = c("Climate","Cities"),
-      position = "topright")
+observeEvent(input$tabs,{
+  if(input$tabs == "tab4"){
+    ## map interface
+    output$climMap <- renderLeaflet({
+      leaflet() %>%
+        setView(lng = -122.77222, lat = 51.2665, zoom = 6) %>%
+        addProviderTiles(leaflet::providers$CartoDB.PositronNoLabels, group = "Positron",
+                         options = leaflet::pathOptions(pane = "mapPane")) %>%
+        leaflet::addProviderTiles(leaflet::providers$Esri.WorldImagery, group = "Satellite",
+                                  options = leaflet::pathOptions(pane = "mapPane")) %>%
+        leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap",
+                                  options = leaflet::pathOptions(pane = "mapPane")) %>%
+        leaflet::addTiles(
+          urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
+          attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
+          group = "Hillshade",
+          options = leaflet::pathOptions(pane = "mapPane")) %>%
+        leaflet::addTiles(
+          urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mblbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
+          attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
+          group = "Cities",
+          options = leaflet::pathOptions(pane = "overlayPane")) %>%
+        addPlugins() %>%
+        leaflet::addLayersControl(
+          baseGroups = c("Hillshade","Positron","Satellite", "OpenStreetMap"),
+          overlayGroups = c("Climate","Cities"),
+          position = "topright")
+    })
+    
+  }
 })
 
 observeEvent(input$tabs, {
@@ -173,7 +178,27 @@ observeEvent(input$byZone,{
   toggleElement(id = "sz.choose",condition = input$byZone != "Zone")
 })
 
-observe({
+observeEvent(input$includeWNA,{
+  if(input$includeWNA == "Yes"){
+    znChoose <- zones
+  }else{
+    znChoose <- zonesBC
+  }
+  updatePickerInput(session,"BGCZone.choose",choices = znChoose)
+})
+
+observeEvent(input$BGCZone.choose,{
+  if(input$byZone != "Zone"){
+    getInputDat()
+    t1 <- paste(input$BGCZone.choose, collapse = "|")
+    tempChoose <- climsumInputs$BGC.chooseBC
+    if(input$includeWNA == "Yes"){tempChoose <- climsumInputs$BGC.choose}
+    szChoose <- tempChoose[grep(t1,tempChoose)]
+    updatePickerInput(session,"sz.choose", choices = szChoose, selected = szChoose[1])
+  }
+})
+
+observeEvent(input$tabs,{
   if(input$tabs == "tab5"){
     #browser()
     getInputDat()
@@ -183,13 +208,6 @@ observe({
       znChoose <- zonesBC
     }
     updatePickerInput(session,"BGCZone.choose",choices = znChoose,selected = "SBS")
-    if(input$byZone != "Zone"){
-      t1 <- paste(input$BGCZone.choose, collapse = "|")
-      tempChoose <- climsumInputs$BGC.chooseBC
-      if(input$includeWNA == "Yes"){tempChoose <- climsumInputs$BGC.choose}
-      szChoose <- tempChoose[grep(t1,tempChoose)]
-      updatePickerInput(session,"sz.choose", choices = szChoose, selected = szChoose[1])
-    }
     updatePickerInput(session,"periodTS",choices = climsumInputs$period.ts, 
                       selected = c("1961 - 1990","1991 - 2020"))
     updatePickerInput(session,"periodOther",choices = climsumInputs$period.other,selected = NULL)

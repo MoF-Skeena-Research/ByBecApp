@@ -31,9 +31,7 @@ sppDb <- dbPool(
   user = "postgres",
   password = "PowerOfBEC"
 )
-onStop(function() {
-  poolClose(sppDb)
-})
+
 climDb <- dbPool(
   drv = RPostgres::Postgres(),
   dbname = "bgc_climate_data",
@@ -42,8 +40,11 @@ climDb <- dbPool(
   user = "postgres",
   password = "PowerOfBEC"
 )
+
+
 onStop(function() {
   poolClose(climDb)
+  poolClose(sppDb)
 })
 
 subzones_colours_ref <- fread("./inputs/WNA_v12_HexCols.csv")
@@ -62,8 +63,9 @@ idDat <- as.data.table(idDat)
 setorder(idDat,SMR,SNR)
 idDat[,ID := c(5,5,10,15,15,4,4,9,14,14,4,4,9,14,14,3,3,8,13,13,3,3,8,13,13,2,2,7,12,12,2,2,7,12,12,1,1,6,11,11)]
 idDat[,edatopic := paste0(SNR,SMR)]
-edaMaxCol <- "#440154FF"
-edaMinCol <- "#FDE725FF"
+
+edaFreqCols <- data.table(FeasVal = rev(seq(4,1,by = -0.5)), 
+                          Col = rev(c('#40004b','#40004b','#762a83','#9970ab','#5aae61','#1b7837','#00441b')))
 assCols <- data.table(ID = c(1,2,3,4,5,0), 
                       Col = c("#E20000","#FF7B00","#FFEC00","#91FB00","#1DB000","#631758"))
 assID <- data.table(assessment = c("Fail","Poor","Fair","Good","Excellent","UN"),
@@ -74,7 +76,7 @@ fhCols <- data.frame(hazard = c("High","Moderate","Low"),
 #grRamp2 <- colorRamp(c("#443e3dFF","#c0c0c0ff"),alpha = T) ##colour ramp for gray values
 taxaCols <- c("#443e3d","#876114","#3d7075","#443e3d","#443e3d")
 taxaFreqCols <- data.table(sppsplit = c(1,1,1,2,2,2,3,3,3),
-                           Freq = c(rep(c("High","Moderate","Low"),3)),
+                           Freq = c(rep(c("3","2","1"),3)),
                            Col = c("#443e3d","#78716f","#828282",
                                    "#876114","#bf994d","#f5ce7f",
                                    "#3d7075","#75c0c7","#bff0f5"))
@@ -103,6 +105,7 @@ allSppNames <- unlist(sppList)
 allSppNames <- substr(allSppNames,1,2)
 allSppNames <- unname(allSppNames)
 
+
 minStart <- dbGetQuery(sppDb,"select min(planted) from offsite")[1,1]
 maxStart <- dbGetQuery(sppDb,"select max(planted) from offsite")[1,1]
 
@@ -128,6 +131,7 @@ wetOpt <- data.table(feasible = c(1,2,3), Col = c("#c24f00ff","#cd804bff","#fbbd
 splitOpt <- "#df00a9ff"
 dryOpt <- data.table(feasible = c(1,2,3), Col = c("#000aa3ff","#565edeff","#8b8fdbff"))
 
+pestOps <- dbGetQuery(sppDb,"select distinct pest from forhealth")[,1]
 ##legends
 climaticLeg <- list(
   labels = c("Climatic Optimum","Wet Site Optimum","Dry Site Optimum","Bimodal Feasibility","Off-site Addition","Removed from CFRG"),
@@ -136,8 +140,8 @@ climaticLeg <- list(
 )
 
 edaLeg <- list(
-  labels = c("Poor Feasibility","Good Feasibility"),
-  colours = c(edaMinCol,edaMaxCol),
+  labels = edaFreqCols$FeasVal,
+  colours = edaFreqCols$Col,
   title = "Edatopic Feasibility"
 )
 
@@ -227,3 +231,11 @@ instr_climmap <- tagList(
   p("Note: The button at the top right of the map allows you to select layers to show, and change
     the base layer.")
 )
+
+##frequency rules
+freq_rules <- data.table(SMR = c(0L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 0L, 1L, 2L, 3L, 4L, 5L, 6L, 
+                                 7L, 0L, 1L, 2L, 3L, 4L, 5L, 6L, 7L),
+                         Feasible = c(1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 2L, 2L, 
+                                      2L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L),
+                         FreqCode = c(1, 2, 2, 2, 3, 2, 2, 1, 1, 1, 1, 2, 3, 2, 1, 1, 1, 1, 1, 1, 
+                                      1, 1, 1, 1))

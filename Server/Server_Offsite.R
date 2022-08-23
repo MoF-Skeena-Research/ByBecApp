@@ -5,43 +5,57 @@ observeEvent(input$showinstr_offsite,{
   shinyalert(title = "Instructions",html = T,text = instr_offsite)
 })
 
-output$offsiteMap <- renderLeaflet({
-  leaflet() %>%
-    setView(lng = -122.77222, lat = 51.2665, zoom = 6) %>%
-    addProviderTiles(leaflet::providers$CartoDB.PositronNoLabels, group = "Positron",
-                     options = leaflet::pathOptions(pane = "mapPane")) %>%
-    leaflet::addProviderTiles(leaflet::providers$Esri.WorldImagery, group = "Satellite",
-                              options = leaflet::pathOptions(pane = "mapPane")) %>%
-    leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap",
-                              options = leaflet::pathOptions(pane = "mapPane")) %>%
-    leaflet::addTiles(
-      urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
-      attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
-      group = "Hillshade",
-      options = leaflet::pathOptions(pane = "mapPane")) %>%
-    leaflet::addTiles(
-      urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mblbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
-      attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
-      group = "Cities",
-      options = leaflet::pathOptions(pane = "overlayPane")) %>%
-    addBGCTiles() %>%
-    leaflet::addLayersControl(
-      baseGroups = c("Hillshade","Positron","Satellite", "OpenStreetMap"),
-      overlayGroups = c("BGCs","Districts","Cities"),
-      position = "topright")
+
+
+observeEvent(input$tabs,{
+  if(input$tabs == "tab2"){
+    sppData <- dbGetQuery(sppDb, "select distinct spp from offsite")[,1]
+    sppList2 <- sppList
+    for(i in 1:length(sppList2)){
+      sppList2[[i]] <- sppList2[[i]][substr(sppList2[[i]],1,2) %in% substr(sppData,1,2)]
+    }
+    updatePickerInput(session, "sppPick2", choices = sppList2, )
+    
+    output$offsiteMap <- renderLeaflet({
+      leaflet() %>%
+        setView(lng = -122.77222, lat = 51.2665, zoom = 6) %>%
+        addProviderTiles(leaflet::providers$CartoDB.PositronNoLabels, group = "Positron",
+                         options = leaflet::pathOptions(pane = "mapPane")) %>%
+        leaflet::addProviderTiles(leaflet::providers$Esri.WorldImagery, group = "Satellite",
+                                  options = leaflet::pathOptions(pane = "mapPane")) %>%
+        leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap",
+                                  options = leaflet::pathOptions(pane = "mapPane")) %>%
+        leaflet::addTiles(
+          urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
+          attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
+          group = "Hillshade",
+          options = leaflet::pathOptions(pane = "mapPane")) %>%
+        leaflet::addTiles(
+          urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mblbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
+          attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
+          group = "Cities",
+          options = leaflet::pathOptions(pane = "overlayPane")) %>%
+        addBGCTiles() %>%
+        leaflet::addLayersControl(
+          baseGroups = c("Hillshade","Positron","Satellite", "OpenStreetMap"),
+          overlayGroups = c("BGCs","Districts","Cities"),
+          position = "topright")
+    })
+    
+    observeEvent(input$trialSelect,{
+      output$assIn <- renderRHandsontable({
+        if(input$trialSelect != ""){
+          dat <- dbGetQuery(sppDb,paste0("select plotid,spp,numplanted,seedlot,assessment from offsite where plotid = '",
+                                         input$trialSelect,"'"))
+          dat <- unique(as.data.table(dat))
+          rhandsontable(dat) %>%
+            hot_col(col = "assessment",type = "dropdown",source = c("Fail","Poor","Fair","Good","Excellent","UN"))
+        }
+      })
+    })
+  }
 })
 
-observeEvent(input$trialSelect,{
-  output$assIn <- renderRHandsontable({
-    if(input$trialSelect != ""){
-      dat <- dbGetQuery(sppDb,paste0("select plotid,spp,numplanted,seedlot,assessment from offsite where plotid = '",
-                                   input$trialSelect,"'"))
-      dat <- unique(as.data.table(dat))
-      rhandsontable(dat) %>%
-        hot_col(col = "assessment",type = "dropdown",source = c("Fail","Poor","Fair","Good","Excellent","UN"))
-    }
-  })
-})
 
 observeEvent(input$submitAss,{
   dat <- as.data.table(hot_to_r(input$assIn))
@@ -96,25 +110,14 @@ observeEvent({c(input$trials2,
                 input$multiSppTrial)},{
                   if(!is.null(input$trials2)){
                     if(input$multiSppTrial){
-                      if(input$sppPick2 == "All"){
+       
                         dat2 <- st_read(sppDb,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
-                                                           "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],
-                                                           "' and plotid in (select plotid from offsite group by plotid having count(distinct spp) > 1)"))
-                      }else{
-                        dat2 <- st_read(sppDb,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
-                                                           "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],"' and spp like '", substr(input$sppPick2,1,2),
-                                                           "%' and plotid in (select plotid from offsite group by plotid having count(distinct spp) > 1)"))
-                      }
+                                                           "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],"' and spp in ('", paste(substr(input$sppPick2,1,2),collapse = "','"),
+                                                           "') and plotid in (select plotid from offsite group by plotid having count(distinct spp) > 1)"))
                     }else{
-                      if(input$sppPick2 == "All"){
                         dat2 <- st_read(sppDb,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
-                                                           "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],
-                                                           "'"))
-                      }else{
-                        dat2 <- st_read(sppDb,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
-                                                           "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],"' and spp like '", substr(input$sppPick2,1,2),
-                                                           "%'"))
-                      }
+                                                           "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],"' and spp in ('", paste(substr(input$sppPick2,1,2),collapse = "','"),
+                                                           "')"))
                     }
                     
                     if(nrow(dat2) == 0){
@@ -122,14 +125,14 @@ observeEvent({c(input$trials2,
                     }else{
                       plotLocs <- unique(dat2["plotid"])
                       dat <- as.data.table(st_drop_geometry(dat2))
-                      if(input$sppPick2 == "All"){
-                        dat <- dat[,.(Col = if(all(assessment == "UN")) "#6B6B6B" else "#AD00BD"),
-                                   by = .(plotid)]
-                      }else{
-                        dat[assID, ID := i.ID, on = "assessment"]
-                        dat <- dat[,.(ID = max(ID)), by = .(plotid,spp)]
-                        dat[assCols, Col := i.Col, on = "ID"]
-                      }
+                      # if(input$sppPick2 == "All"){
+                      #   dat <- dat[,.(Col = if(all(assessment == "UN")) "#6B6B6B" else "#AD00BD"),
+                      #              by = .(plotid)]
+                      # }else{
+                      dat[assID, ID := i.ID, on = "assessment"]
+                      dat <- dat[,.(ID = max(ID)), by = .(plotid,spp)]
+                      dat[assCols, Col := i.Col, on = "ID"]
+                      
                       dat[,label := paste0("Name: ",plotid)]
                       dat <- dat[,.(plotid,label,Col)]
                       dat[,Col := as.character(Col)]

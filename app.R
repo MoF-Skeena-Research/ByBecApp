@@ -22,6 +22,8 @@ source("Server/FeasAppSource.R") ##javascript functions
 # Define UI for application that draws a histogram
 ui <- fluidPage(theme = shinytheme("lumen"),
                 tags$head(HTML("<title>Power of BEC</title>")),
+                tags$script(src = "https://unpkg.com/@popperjs/core@2"),
+                tags$script(src = "https://unpkg.com/tippy.js@6"),
                 fluidRow(style = "background-color: #003366;",
                     column(6,img(src = "images/gov3_bc_logo.png",align = "left")),
                          column(6,h1("The By-BEC Portal",style = "color: white;"))),
@@ -39,7 +41,8 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                                           choices = c("None",sppList),
                                                           selected = "Cw - western redcedar"),                                         
                                               h4("Map Display"),
-                                              checkboxInput("updatedfeas","Show Updated Range and Feasibility",value = F, width = "250px"),
+                                              checkboxInput("updatedfeas","Show Original Feasibility",value = F, width = "250px"),
+                                              checkboxInput("showadd","Show Additions/Deletions",value = F, width = "250px"),
                                               checkboxInput("showFreq","Show Frequency",value = T),
                                               h4("Edatopic Feasibility:"),
                                               girafeOutput("edaplot",height = "350px"),
@@ -47,7 +50,8 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                               checkboxGroupInput("showtrees","Show species plots",choices = c("BC","AB","US"),inline = T),
                                               checkboxGroupInput("trials","Show location of offsite trials",c("AMAT","RESULTS"), inline = T),
                                               sliderInput("trialStart","Filter offsite trials by planting date:",
-                                                          min = minStart, max = maxStart, value = c(minStart,maxStart))
+                                                          min = minStart, max = maxStart, value = c(minStart,maxStart)),
+                                              downloadButton("downloadFeasMap",label = "Export Spatial")
                                         )
                                         
                                  ),
@@ -84,8 +88,10 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                     h3("Filters"),
                                     pickerInput("sppPick2",
                                                 label = "Select a Species",
-                                                choices = c("All",sppList),
-                                                selected = "All"),
+                                                choices = sppList,
+                                                selected = sppList[[1]][1],
+                                                multiple = T,
+                                                options = pickerOptions(actionsBox = T)),
                                     checkboxInput("multiSppTrial","Only show multi-species trials"),
                                     sliderInput("trialStart2","Filter offsite trials by planting date:",
                                                 min = minStart, max = maxStart, value = c(minStart,maxStart)),
@@ -122,20 +128,46 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                              )
                     ),
                     tabPanel(value = "tab3",title = "Forest Health",
+                             useShinyjs(),
+                             extendShinyjs(text = '
+                                  shinyjs.selectInput_tooltips = function(params){
+                                  var defaultParams = {
+                                    id : null,
+                                    tooltips : null
+                                  };
+                                  params = shinyjs.getParams(params, defaultParams);
+                        
+                                  var selectInput = $("#"+params.id).closest("div").find(".dropdown-menu").get(1);
+                                  var element_selectInput = selectInput.childNodes;
+                        
+                                  if(element_selectInput.length >0 && element_selectInput[0].title == ""){ // to be trigger only once
+                                    for(var i = 0; i < element_selectInput.length; i++){
+                                      element_selectInput[i].title = params.tooltips[i];
+                                    }
+                                  }
+                                }; 
+                              ',
+                                           functions = "selectInput_tooltips"),
                              column(3,
                                     h2("Hazard Rating by Tree and Pest"),
                                     selectInput("fhSpp",
                                                 label = "Select Host Species",
                                                 choices = c("None",sppList)),
-                                    selectInput("pestSpp",
+                                    pickerInput("pestSpp",
                                                 label = "Select Pest",
                                                 choices = c("DRN","DRL","IDW"),
                                                 multiple = F),
                                     radioButtons("fh_region","Show Results for: ", choices = c("BC","WNA"),
                                                  selected = "BC", inline = T),
+                                    splitLayout(actionButton("downloadFH","Download CSV"),
+                                                actionButton("uploadFH","Upload CSV"),
+                                                downloadButton("downloadFHMap","Download Spatial"))
+                                    ,
                                     actionButton("showMatrix","Show Pest-by-Host Table"),
                                     h3("Hazard By BGC"),
-                                    rHandsontableOutput("fh_hot_long"),
+                                    panel(style = "overflow-y:scroll; max-height: 500px; position:relative; align: centre",
+                                        rHandsontableOutput("fh_hot_long")
+                                    ),
                                     textInput("fhModLong",label = "Enter your initials:"),
                                     actionButton("submitFHLong","Submit Hazard Updates")
                              ),
@@ -149,9 +181,11 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                     span(textOutput("pestDatLabel", inline = T),style= "font-size:22px"),
                                     p("Note: to add a new pest, right-click on the table, select 'add row', and enter 
                                    pest name, code, and hazard ratings."),
-                                    rHandsontableOutput("fh_hot"),
-                                    textInput("fhMod",label = "Enter your initials:"),
-                                    actionButton("submitFH","Submit Hazard Updates")
+                                    #panel(style = "overflow-y:scroll; max-height: 500px; position:relative; align: centre",
+                                        rHandsontableOutput("fh_hot"),
+                                        textInput("fhMod",label = "Enter your initials:"),
+                                        actionButton("submitFH","Submit Hazard Updates")
+                                    #)
                              )
                     ),
                     navbarMenu("Climate Summaries",
@@ -262,7 +296,7 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                        )
                                )
                         ),
-                    tabPanel("Find a BGC",
+                    tabPanel(value = "tab6", title = "Find a BGC",
                              fluidRow(
                                  column(2,
                                         selectInput("selectBGC","Select Zone", 
@@ -295,7 +329,7 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                      necessary. The site also contains a utility tool, 'Find a BGC', which 
                                      provides and easy way to select BGCs either by location or name. Each app
                                      contains an Intructions button, which will pop-up detailed information 
-                                     about the app. Remember: BEC is God!", style = "font-size:18px"),
+                                     about the app.", style = "font-size:18px"),
                                    hr(),
                                    h3("Authors"),
                                    p("Site Author: Kiri Daust"),

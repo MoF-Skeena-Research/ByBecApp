@@ -4,58 +4,170 @@ observeEvent(input$showinstr_forhealth,{
   shinyalert(title = "Instructions",html = T,text = instr_forhealth)
 })
 
-observeEvent(input$fhSpp,{
-  treeSpp <- substr(input$fhSpp,1,2)
-  dat <- dbGetQuery(sppDb,paste0("select distinct pest,pest_name from forhealth where treecode like '",treeSpp,"'"))
-  if(nrow(dat) == 0){
-    updateSelectInput(session, "pestSpp", choices = "")
-  }else{
-    dat$pest_name <- paste0(dat$pest," - ", dat$pest_name)
-    temp <- dat$pest
-    names(temp) <- dat$pest_name
-    pList <- list()
-    for(pcat in pestCat$pest){
-      pList[[pcat]] <- temp[temp %in% pestCat[pest == pcat,pest_code]]
+observeEvent(input$downloadFH,{
+  showModal(modalDialog(
+    selectInput("downloadPest","Select Pest",choices = pestOps,multiple = F),
+    downloadButton("downloadPestButton")
+  ))
+})
+
+observeEvent(input$uploadFH,{
+  showModal(modalDialog(
+    h2("Upload file with updates"),
+    fileInput("file1", "Upload csv in same format as downloadable data. Updates must be in hazard_updates column",
+              accept = c(
+                "text/csv",
+                "text/comma-separated-values,text/plain",
+                ".csv")
+    ),
+    textInput("fhUploadMod","Enter your initials"),
+    actionButton("fhUploadGo","Submit to Database")
+  ))
+})
+
+observe({
+  toggleElement(id = "downloadFHMap",
+                condition = function() input$fhSpp == "None")
+})
+
+
+##update and submit to db
+observeEvent(input$fhUploadGo,{
+  if(!is.null(input$file1)){
+    dat <- fread(input$file1$datapath)
+    pests <- unique(dat$pest)
+    dbDat <- dbGetQuery(sppDb,paste0("select * from forhealth where pest IN ('",
+                                     paste(pests,collapse = "','"),"') and region = 'BC'"))
+    dbDat <- as.data.table(dbDat)
+    dbDat[dat, new := i.hazard_update, on = c("bgc","treecode","pest")]
+    datNew <- dbDat[hazard_update != new,]
+    datNew[,mod := input$fhUploadMod]
+    if(any(!datNew$hazard_update %in% c("Low","Moderate","High","UN"))){
+      shinyalert("Oops!","Hazard values must be Low, Moderate, High, or UN. Please correct the values and resubmit")
+    }else{
+      datNew[,comb := paste0("('",bgc,"','",treecode,"','",pest,"','",new,"','",mod,"')")]
+      dat <- paste(datNew$comb,collapse = ",")
+      ##print(dat)
+      dbExecute(sppDb,paste0("UPDATE forhealth
+               SET hazard_update = new.hazard_update,
+               mod = new.mod
+               FROM (values ",dat,") 
+               AS new(bgc,treecode,pest,hazard_update,mod)
+               WHERE (forhealth.bgc = new.bgc AND forhealth.treecode = new.treecode AND forhealth.pest = new.pest)"))
+      shinyalert("Thank you!","Your updates have been recorded", type = "info",
+                 imageUrl = "images/puppy1.jpg",imageHeight = "100px", inputId = "dbmessagefh")
     }
-    pList[["Other"]] <- temp[!temp %in% pestCat$pest_code]
-    updateSelectInput(session, "pestSpp", choices = pList)
+    
   }
 })
 
-output$fhMap <- renderLeaflet({
-  leaflet() %>%
-    setView(lng = -122.77222, lat = 51.2665, zoom = 6) %>%
-    addProviderTiles(leaflet::providers$CartoDB.PositronNoLabels, group = "Positron",
-                     options = leaflet::pathOptions(pane = "mapPane")) %>%
-    leaflet::addProviderTiles(leaflet::providers$Esri.WorldImagery, group = "Satellite",
-                              options = leaflet::pathOptions(pane = "mapPane")) %>%
-    leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap",
-                              options = leaflet::pathOptions(pane = "mapPane")) %>%
-    leaflet::addTiles(
-      urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
-      attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
-      group = "Hillshade",
-      options = leaflet::pathOptions(pane = "mapPane")) %>%
-    leaflet::addTiles(
-      urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mblbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
-      attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
-      group = "Cities",
-      options = leaflet::pathOptions(pane = "overlayPane")) %>%
-    addBGCTiles() %>%
-    leaflet::addLayersControl(
-      baseGroups = c("Hillshade","Positron","Satellite", "OpenStreetMap"),
-      overlayGroups = c("BGCs","Pests","Districts","Cities"),
-      position = "topright") %>%
-    addLegend(position = "bottomright",
-              labels = c("Unspecified","Low","Moderate","High","Outside Range"),
-              colors = c("#443e3d","#0CC200","#FFEF01","#D80000","#840090"),
-              title = "Hazard",
-              layerId = "bec_fh")
+
+  output$downloadPestButton <- downloadHandler(
+    filename = paste0("ForestHealth_Download.csv"),
+    content = function(file){
+      dat <- dbGetQuery(sppDb,paste0("SELECT * from forhealth WHERE pest = '",
+                                     input$downloadPest,"' AND region = 'BC'"))
+      dat <- as.data.table(dat)
+      fwrite(dat, file)
+    }
+  )
+
+
+observeEvent(input$fhSpp,{
+output$downloadFHMap <- downloadHandler(
+  filename = paste0("TheBECZone_ForestHealth_",substr(input$fhSpp,1,2),"_",input$pest,".gpkg"),
+  content = function(file){
+    Q1 <- paste0("SELECT bgc_simple.bgc, temp.hazard_update as hazard, temp.treecode, temp.pest, bgc_simple.geom
+                    FROM bgc_simple
+                    JOIN (SELECT bgc, hazard_update, treecode, pest
+                          FROM forhealth
+                          WHERE treecode like '",substr(input$fhSpp,1,2),"'
+                          AND pest = '",input$pestSpp,"' 
+                          AND hazard_update <> 'UN' 
+                          AND region = 'BC') temp
+                    ON (bgc_simple.bgc = temp.bgc)")
+    print(Q1)
+    dat <- st_read(sppDb,query = Q1)
+    st_write(dat,file)
+  }
+)
+})
+observeEvent(input$fhSpp,{
+  treeSpp <- substr(input$fhSpp,1,2)
+  dat <- setDT(dbGetQuery(sppDb,paste0("select distinct forhealth.pest,pest_name,common_name 
+                                 from forhealth 
+                                 join pest_names 
+                                 on (forhealth.pest = pest_names.pest) 
+                                 where treecode like '",treeSpp,"'")))
+  ##browser()
+  if(nrow(dat) == 0){
+    updatePickerInput(session, "pestSpp", choices = "")
+  }else{
+    dat$pest_name <- paste0(dat$pest," - ", dat$pest_name)
+    ##names(dat$pest) <- dat$pest_name
+    ##browser()
+    pList <- list()
+    comNms <- c('','')
+    for(pcat in unique(pestCat$pest)){
+      sub <- dat[pest %in% pestCat[pest == pcat,pest_code],]
+      t1 <- sub$pest
+      names(t1) <- sub$pest_name
+      pList[[pcat]] <- t1
+      comNms <- append(comNms, sub$common_name)
+      if(nrow(sub) > 0){
+        comNms <- append(comNms, c("",""))
+      }
+    }
+    sub <- dat[!pest %in% pestCat$pest_code,]
+    t1 <- sub$pest
+    names(t1) <- sub$pest_name
+    comNms <- append(comNms, sub$common_name)
+    pList[["Other"]] <- t1
+    print(comNms)
+    updatePickerInput(session, "pestSpp", choices = pList)
+    onclick("pestSpp", js$selectInput_tooltips("pestSpp",comNms))
+  }
+})
+
+observeEvent(input$tabs,{
+  if(input$tabs == "tab3"){
+    output$fhMap <- renderLeaflet({
+      leaflet() %>%
+        setView(lng = -122.77222, lat = 51.2665, zoom = 6) %>%
+        addProviderTiles(leaflet::providers$CartoDB.PositronNoLabels, group = "Positron",
+                         options = leaflet::pathOptions(pane = "mapPane")) %>%
+        leaflet::addProviderTiles(leaflet::providers$Esri.WorldImagery, group = "Satellite",
+                                  options = leaflet::pathOptions(pane = "mapPane")) %>%
+        leaflet::addProviderTiles(leaflet::providers$OpenStreetMap, group = "OpenStreetMap",
+                                  options = leaflet::pathOptions(pane = "mapPane")) %>%
+        leaflet::addTiles(
+          urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
+          attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
+          group = "Hillshade",
+          options = leaflet::pathOptions(pane = "mapPane")) %>%
+        leaflet::addTiles(
+          urlTemplate = paste0("https://api.mapbox.com/styles/v1/", mblbsty, "/tiles/{z}/{x}/{y}?access_token=", mbtk),
+          attribution = '&#169; <a href="https://www.mapbox.com/feedback/">Mapbox</a>',
+          group = "Cities",
+          options = leaflet::pathOptions(pane = "overlayPane")) %>%
+        addBGCTiles() %>%
+        leaflet::addLayersControl(
+          baseGroups = c("Hillshade","Positron","Satellite", "OpenStreetMap"),
+          overlayGroups = c("BGCs","Pests","Districts","Cities"),
+          position = "topright") %>%
+        addLegend(position = "bottomright",
+                  labels = c("Unspecified","Low","Moderate","High","Outside Range"),
+                  colors = c("#443e3d","#0CC200","#FFEF01","#D80000","#840090"),
+                  title = "Hazard",
+                  layerId = "bec_fh")
+    })
+    
+  }
 })
 
 prepDatFH <- reactive({
   QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,feasible from feasorig where spp = '",
-                substr(input$fhSpp,1,2),"' and feasible in (1,2,3,4,5)")
+                substr(input$fhSpp,1,2),"' and feasible in (1,2,3)")
   d1 <- dbGetQuery(sppDb, QRY)
   if(nrow(d1) != 0){
     feas <- as.data.table(d1)
@@ -127,11 +239,13 @@ observeEvent(input$fh_click,{
 
 observeEvent({c(input$fh_click,input$fhSpp,input$pestSpp,input$submitFHLong,input$fh_region)},{
   if(input$fh_region == "BC"){
-    q1 <- paste0("select treecode, pest, pest_name, bgc, hazard, hazard_update 
-                                          from forhealth where bgc = '",input$fh_click,"' and region = 'BC'")
+    q1 <- paste0("select treecode, forhealth.pest, common_name, pest_name, bgc, hazard, hazard_update 
+                                          from forhealth join pest_names on (forhealth.pest = pest_names.pest) 
+                 where bgc = '",input$fh_click,"' and region = 'BC'")
   }else{
-    q1 <- paste0("select treecode, pest, pest_name, bgc, hazard, hazard_update 
-                                          from forhealth where bgc = '",input$fh_click,"'")
+    q1 <- paste0("select treecode, forhealth.pest, common_name, pest_name, bgc, hazard, hazard_update 
+                                          from forhealth join pest_names on (forhealth.pest = pest_names.pest) 
+                 where bgc = '",input$fh_click,"'")
   }
   dat1 <- dbGetQuery(sppDb,q1)
   dat <- as.data.table(dat1)
@@ -140,18 +254,18 @@ observeEvent({c(input$fh_click,input$fhSpp,input$pestSpp,input$submitFHLong,inpu
     col_num <- NULL
     row_num <- NULL
   }else{
-    dat <- dcast(dat, pest_name + pest ~ treecode, value.var = "hazard_update", 
+    dat <- dcast(dat, common_name + pest_name + pest ~ treecode, value.var = "hazard_update", 
                  fun.aggregate = function(x) x[1])
     dat[is.na(dat)] <- "NULL"
-    col_num <- which(colnames(dat) == substr(input$fhSpp,1,2)) - 1
+    col_num <- which(colnames(dat) == substr(input$fhSpp,1,2)) - 3
     row_num <- which(dat$pest == input$pestSpp) - 1
-  }
-  output$fh_hot <- renderRHandsontable({
-    rhandsontable(dat,col_highlight = col_num, 
-                  row_highlight = row_num) %>%
-      hot_cols(type = "dropdown",source = c("Nil","Low","Moderate","High","UN"),
-               renderer = 
-                 "function(instance, td, row, col, prop, value, cellProperties) {
+    
+    output$fh_hot <- renderRHandsontable({
+      rhandsontable(dat[,!c("common_name","pest_name")],col_highlight = col_num, 
+                    row_highlight = row_num,height = 600)  %>%
+        hot_cols(type = "dropdown",source = c("Nil","Low","Moderate","High","UN"),
+                 renderer = 
+                   "function(instance, td, row, col, prop, value, cellProperties) {
                                         Handsontable.renderers.TextRenderer.apply(this, arguments);
                                       if(instance.params) {
                                         hcols = instance.params.col_highlight
@@ -173,8 +287,19 @@ observeEvent({c(input$fh_click,input$fhSpp,input$pestSpp,input$submitFHLong,inpu
                                           td.style.background = 'yellow';
                                         }
                                       }"
-      )
-  })
+        ) %>% hot_col(1,renderer = paste0("function(instance, td, row, col, prop, value, cellProperties) {
+                              var titleLookup = ['",paste(dat$common_name, collapse = "','"),"'];
+                              //console.log(titleLookup);
+                              if(td.hasOwnProperty('_tippy')) {td._tippy.destroy()}
+                              tippy(td, {
+                                content: titleLookup[row],
+                              });
+                              Handsontable.renderers.TextRenderer.apply(this, arguments);
+                              return (td);
+                            }"))
+    })
+  }
+  
 })
 
 observeEvent({c(input$pestSpp,
