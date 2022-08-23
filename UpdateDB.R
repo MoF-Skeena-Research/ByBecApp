@@ -35,15 +35,16 @@ sppDb <- dbPool(
 
 ###now pull from database
 dbFeas <- setDT(dbGetQuery(sppDb,"select * from feasorig"))
-fwrite(dbFeas,"feasorig_save.csv")##just incase something goes wrong
-# updaterate <- fread("./inputs/Feasibility_v12_11.csv")
+fwrite(dbFeas,"feasorig_save4.csv") ##just in case something goes wrong
+ #updaterate <- fread("./inputs/Feasibility_v12_11.csv")
 # dbFeasNew <- left_join(dbFeas, updaterate)
 # fwrite(dbFeasNew,"feasorig_save2.csv")##just incase something goes wrong
 # feasNew <- merge(dbFeas,updates, by = c("ss_nospace","spp"), all = T)
+##____________LOAD Externally updated spread shett to merge back into database
 
 feasNew <- fread("feasorig_save2.csv")###read back in an updated csv file
 ##check that none of the updates conflict with previous updates
-# feasNew[!is.na(mod) & !is.na(Update1),]
+#feasNew[!is.na(mod) & !is.na(Update1),]
 ##ok all good
 #reviewers <- "SAS-HAK"
 #feasNew[!is.na(Update1),`:=`(newfeas = Update1,mod = reviewers)]
