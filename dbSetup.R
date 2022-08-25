@@ -7,13 +7,14 @@ con <- dbConnect(drv, user = "postgres", password = "PowerOfBEC", host = "138.19
                  port = 5432, dbname = "spp_feas")
 
 ##update forest health
+#fh <- dbGetQuery(con,"select * from forhealth_backup")
 fh <- dbGetQuery(con,"select * from forhealth")
 feas <- dbGetQuery(con,"select * from feasorig")
 fhUnits <- unique(fh$bgc)
 allUnits <- unique(feas$bgc)
-
-sppFeas <- feas[newfeas < 4,.(minfeas = min(newfeas)),by = .(bgc,spp)]
-
+setDT(feas)
+#sppFeas <- feas[newfeas < 4,.(minfeas = min(newfeas)), by = .(bgc ,spp)]
+sppFeas <- feas[newfeas < 4,.(minfeas = min(newfeas)), by = .(bgc ,spp)]
 fh <- setDT(fh)
 setkey(fh,bgc,treecode,pest)
 feas <- setDT(feas)
@@ -44,7 +45,7 @@ dbSafeNames = function(names) {
   names
 }
 
-feas <- fread("~/CommonTables/Feasibility_v12_9.csv")
+feas <- fread("./inputs/Feasibility_v12_12.csv")
 feas <- feas[,.(BGC,SS_NoSpace,SppVar,Feasible)]
 setnames(feas, old = "SppVar",new = "SppSplit")
 feas[,Spp := SppSplit]
@@ -60,7 +61,7 @@ feas[,mod := NA_character_]
 feas <- feas[sppsplit != "X",]
 feas[,fid := seq_along(feas$bgc)]
 
-eda <- fread("~/CommonTables/Edatopic_v12_9.csv")
+eda <- fread("./inputs//Edatopic_v12_11.csv")
 #eda <- eda[is.na(Special) | Special == "",.(BGC,SS_NoSpace,Edatopic)]
 
 eda[,SMR := as.numeric(gsub("[[:alpha:]]","", Edatopic))]
