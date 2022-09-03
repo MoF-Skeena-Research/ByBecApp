@@ -82,69 +82,86 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                              )
                     ),
                     tabPanel(value = "tab2", title = "Off-site Trials",
-                             column(3,
-                                    h3("Select Tree Species"),
-                                    pickerInput("sppPick2",
-                                                #label = "Select Species",
-                                                choices = sppList,
-                                                selected = sppList[[1]][5],
-                                                multiple = T,
-                                                options = pickerOptions(actionsBox = T)),
-                                    hr(),
-                                    h3("Filters"),
-                                    checkboxInput("multiSppTrial","Only show multi-species trials"),
-                                   # checkboxGroupInput("trials2","Show trials by type", offsiteProj), 
-                                   h4("Show Selected Trial Types"),
-                                   pickerInput("trials2",
-                                               #label = "Select Species",
-                                               choices = offsiteProj,
-                                               selected = c("Research", "AMAT", "RESULTS", "General Offsite"),
-                                               multiple = TRUE,
-                                               options = pickerOptions(actionsBox = T)),
-
-                                  h4("Filter offsite trials by planting date:"),
-                                    sliderInput("trialStart2", "",
-                                                min = minStart, max = maxStart, value = c(minStart,maxStart)),
-                                    br(),
-                                    hr(),
-                                   h3("Existing Trial Information"),
-                                   selectInput("trialSelect",
-                                               label = "Select a trial, or click on map",
-                                               choices = NULL),
-                                  h5("add in here fields for trial type, project name, latitude, longitude, elevation, BGC, Site series  "),
-                                   h4("Species assessment in table below:"),
-                                   rHandsontableOutput("assIn"),
-                                   textInput("assessMod",label = "Enter your initials:"),
-                                   actionButton("submitAss","Submit Assessment"),
-                                   br(),
-                                   h4("Download trial data and updates:"),
-                                   downloadButton("downloadPest"),
-
+                             fluidRow(
+                                 column(3,
+                                        h3("Select Tree Species"),
+                                        pickerInput("sppPick2",
+                                                    choices = sppList,
+                                                    selected = sppList[[1]][1],
+                                                    multiple = T,
+                                                    options = pickerOptions(actionsBox = T)),
+                                        hr(),
+                                        h3("Filters"),
+                                        checkboxInput("multiSppTrial","Only show multi-species trials"),
+                                        # checkboxGroupInput("trials2","Show trials by type", offsiteProj), 
+                                        h4("Show Selected Trial Types"),
+                                        pickerInput("trialType",
+                                                    #label = "Select Species",
+                                                    #choices = offsiteProj,
+                                                    choices = c("Research", "AMAT", "RESULTS", 
+                                                                "General Offsite", "Operational"),
+                                                    selected = c("Research", "AMAT", "RESULTS", 
+                                                                 "General Offsite", "Operational"),
+                                                    multiple = TRUE,
+                                                    options = pickerOptions(actionsBox = T)),
+                                        
+                                        h4("Filter offsite trials by planting date:"),
+                                        sliderInput("trialStart2", "",
+                                                    min = minStart, max = maxStart, value = c(minStart,maxStart)),
+                                        br(),
+                                        hr()
+  
+                                 ),
+                                 column(9,
+                                        actionButton("showinstr_offsite","Click To Show Instructions"),
+                                        leafglOutput("offsiteMap", height = "70vh"),
+                                        
+                                 )
                              ),
-                             column(9,
-                                    actionButton("showinstr_offsite","Click To Show Instructions"),
-                                    leafglOutput("offsiteMap", height = "70vh"),
-                                    h3("Add New Offsite-Trial"),
-                                    splitLayout(
-                                      selectInput("addTr_proj",label = "Choose Project Name",choices = offsiteProj,multiple = F),
-                                      textInput("addTr_id",label = "Enter trial id"),
-                                      dateInput("addTr_planted",label = "Enter date planted")
-                                    ),
-                                    #h3("Trial Info"),
-                                    #selectInput("trialSelect",
-                                    #            label = "Select a trial, or click on map",
-                                    #            choices = NULL),
-                                    
-                                    h4("Enter location or click on map:"),
-                                    splitLayout(
-                                      textInput("addTr_lat","Latitude"),
-                                      textInput("addTr_long","Longitude")
-                                    ),
-                                    rHandsontableOutput("addTrial"),
-                                    textInput("trialMod","Enter your initials:"),
-                                    actionButton("submitTrial","Submit Trial")
+                             fluidRow(
+                                 column(6,
+                                        selectInput("trialSelect",
+                                                    label = "Select a trial, or click on map",
+                                                    choices = NULL),
+                                        h3("Site Info"),
+                                        rHandsontableOutput("offsite_site")
+                                        ),
+                                 column(6,
+                                        h3("Planting Info"),
+                                        rHandsontableOutput("offsite_planting")
+                                        )
                              )
+                             
                     ),
+                    # h3("Existing Trial Information"),
+                    # 
+                    # h5("add in here fields for trial type, project name, latitude, longitude, elevation, BGC, Site series  "),
+                    # h4("Species assessment in table below:"),
+                    # rHandsontableOutput("assIn"),
+                    # textInput("assessMod",label = "Enter your initials:"),
+                    # actionButton("submitAss","Submit Assessment"),
+                    # br(),
+                    # h4("Download trial data and updates:"),
+                    # downloadButton("downloadPest"),
+                    # h3("Add New Offsite-Trial"),
+                    # splitLayout(
+                    #     selectInput("addTr_proj",label = "Choose Project Name",choices = offsiteProj,multiple = F),
+                    #     textInput("addTr_id",label = "Enter trial id"),
+                    #     dateInput("addTr_planted",label = "Enter date planted")
+                    # ),
+                    # #h3("Trial Info"),
+                    # #selectInput("trialSelect",
+                    # #            label = "Select a trial, or click on map",
+                    # #            choices = NULL),
+                    # 
+                    # h4("Enter location or click on map:"),
+                    # splitLayout(
+                    #     textInput("addTr_lat","Latitude"),
+                    #     textInput("addTr_long","Longitude")
+                    # ),
+                    # rHandsontableOutput("addTrial"),
+                    # textInput("trialMod","Enter your initials:"),
+                    # actionButton("submitTrial","Submit Trial")
                     tabPanel(value = "tab3",title = "Forest Health",
                              useShinyjs(),
                              extendShinyjs(text = '

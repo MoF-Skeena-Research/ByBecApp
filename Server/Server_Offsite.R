@@ -42,21 +42,44 @@ observeEvent(input$tabs,{
           position = "topright")
     })
     
-    observeEvent(input$trialSelect,{
-      output$assIn <- renderRHandsontable({
-        if(input$trialSelect != ""){
-          dat <- dbGetQuery(sppDb,paste0("select plotid,spp,numplanted,seedlot,assessment from offsite where plotid = '",
-                                         input$trialSelect,"'"))
-          dat <- unique(as.data.table(dat))
-          rhandsontable(dat) %>%
-            hot_col(col = "assessment",type = "dropdown",source = c("Fail","Poor","Fair","Good","Excellent","UN"))
-        }
-      })
-    })
+    # observeEvent(input$trialSelect,{
+    #   output$assIn <- renderRHandsontable({
+    #     if(input$trialSelect != ""){
+    #       dat <- dbGetQuery(sppDb,paste0("select plotid,spp,numplanted,seedlot,assessment from offsite where plotid = '",
+    #                                      input$trialSelect,"'"))
+    #       dat <- unique(as.data.table(dat))
+    #       rhandsontable(dat) %>%
+    #         hot_col(col = "assessment",type = "dropdown",source = c("Fail","Poor","Fair","Good","Excellent","UN"))
+    #     }
+    #   })
+    # })
   }
 })
 
+observeEvent(input$trialSelect,{
+  output$offsite_site <- renderRHandsontable({
+    if(input$trialSelect != ""){
+      dat <- setDT(dbGetQuery(sppDb,paste0("select trial_id,trial_type,plantingyear,bgc,ss_nospace from offsite_site where trial_id = '",
+                                     input$trialSelect,"'")))
+      rhandsontable(dat)
+    }
+  })
+})
 
+observeEvent(input$trialSelect,{
+  output$offsite_planting <- renderRHandsontable({
+    if(input$trialSelect != ""){
+      dat <- setDT(dbGetQuery(sppDb,paste0("select trial_id, spp, seedlots, stocktype,assessor_qual,qual_date 
+                                           from offsite_planting where trial_id = '",
+                                           input$trialSelect,"'")))
+      rhandsontable(dat) %>%
+        hot_col("assessor_qual", type = "dropdown", 
+                source = c("Fail","Poor","Fair","Good","Excellent","UN"),strict = T)
+    }
+  })
+})
+
+##this part will need to be fixed
 observeEvent(input$submitAss,{
   dat <- as.data.table(hot_to_r(input$assIn))
   dat[,mod := input$assessMod]
@@ -77,12 +100,13 @@ observeEvent(input$offsiteMap_glify_click,{
   updateSelectInput(session,"trialSelect",selected = nme)
 })
 
-output$addTrial <- renderRHandsontable({
-  input$submitTrial
-  rhandsontable(trialInit) %>%
-    hot_col("assessment", type = "dropdown", 
-            source = c("Fail","Poor","Fair","Good","Excellent","UN"),strict = T)
-})
+
+# output$addTrial <- renderRHandsontable({
+#   input$submitTrial
+#   rhandsontable(trialInit) %>%
+#     hot_col("assessment", type = "dropdown", 
+#             source = c("Fail","Poor","Fair","Good","Excellent","UN"),strict = T)
+# })
 
 observeEvent(input$offsiteMap_click,{
   lat <- input$offsiteMap_click$lat
@@ -104,40 +128,51 @@ observeEvent(input$submitTrial,{
   updateTextInput(session,"addTr_id",value = "")
 },priority = 5)
 
-observeEvent({c(input$trials2,
+observeEvent({c(input$trialType,
                 input$trialStart2,
                 input$sppPick2,
                 input$multiSppTrial)},{
-                  if(!is.null(input$trials2)){
+                  if(!is.null(input$trialType) & !is.null(input$sppPick2)){
+                    #browser()
                     if(input$multiSppTrial){
        
-                        dat2 <- st_read(sppDb,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
-                                                           "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],"' and spp in ('", paste(substr(input$sppPick2,1,2),collapse = "','"),
-                                                           "') and plotid in (select plotid from offsite group by plotid having count(distinct spp) > 1)"))
-                    }else{
-                        dat2 <- st_read(sppDb,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where project_id in ('",paste(input$trials2,collapse = "','"),
-                                                           "') and planted > '", input$trialStart2[1],"' and planted < '",input$trialStart2[2],"' and spp in ('", paste(substr(input$sppPick2,1,2),collapse = "','"),
-                                                           "')"))
+                        dat2 <- st_read(sppDb,query = paste0("select offsite_planting.trial_id, spp, trial_type, assessor_qual, geometry 
+                                                             from offsite_planting 
+                                                             join offsite_site using (trial_id) 
+                                                             where trial_type in ('",paste(input$trialType,collapse = "','"),
+                                                           "') and plantingyear > ", as.integer(format(input$trialStart2[1],format = "%Y"))," and plantingyear < ",as.integer(format(input$trialStart2[2],format = "%Y")),
+                                                           " and spp in ('", paste(substr(input$sppPick2,1,2),collapse = "','"),
+                                                           "') and trial_id in (select trial_id from offsite_planting group by trial_id having count(distinct spp) > 1)"))
+                    }else{ ### need to join both to get trial type, 
+                        dat2 <- st_read(sppDb,query = paste0("select offsite_planting.trial_id, spp, trial_type, assessor_qual, geometry 
+                                                             from offsite_planting 
+                                                             join offsite_site using (trial_id) 
+                                                             where trial_type in ('",paste(input$trialType,collapse = "','"),
+                                                             "') and plantingyear > ", as.integer(format(input$trialStart2[1],format = "%Y"))," and plantingyear < ",as.integer(format(input$trialStart2[2],format = "%Y")),
+                                                             " and spp in ('", paste(substr(input$sppPick2,1,2),collapse = "','"),
+                                                             "')"))
                     }
                     
                     if(nrow(dat2) == 0){
                       dat2 <- NULL
                     }else{
-                      plotLocs <- unique(dat2["plotid"])
+                      plotLocs <- unique(dat2["trial_id"])
                       dat <- as.data.table(st_drop_geometry(dat2))
                       # if(input$sppPick2 == "All"){
                       #   dat <- dat[,.(Col = if(all(assessment == "UN")) "#6B6B6B" else "#AD00BD"),
                       #              by = .(plotid)]
                       # }else{
-                      dat[assID, ID := i.ID, on = "assessment"]
-                      dat <- dat[,.(ID = max(ID)), by = .(plotid,spp)]
+                      dat[,assessor_qual := as.character(assessor_qual)]
+                      dat[is.na(assessor_qual), assessor_qual := "UN"]
+                      dat[assID, ID := i.ID, on = c(assessor_qual = "assessment")]
+                      dat <- dat[,.(ID = max(ID)), by = .(trial_id,spp)]
                       dat[assCols, Col := i.Col, on = "ID"]
                       
-                      dat[,label := paste0("Name: ",plotid)]
-                      dat <- dat[,.(plotid,label,Col)]
+                      dat[,label := paste0("Name: ",trial_id)]
+                      dat <- dat[,.(trial_id,label,Col)]
                       dat[,Col := as.character(Col)]
-                      updateSelectInput(session,"trialSelect",choices = unique(dat$plotid))
-                      plotLocs <- merge(plotLocs, dat, by = "plotid")
+                      updateSelectInput(session,"trialSelect",choices = unique(dat$trial_id))
+                      plotLocs <- merge(plotLocs, dat, by = "trial_id")
                       leafletProxy("offsiteMap") %>%
                         addGlPoints(data = plotLocs,layerId = "tree_trial",popup = ~ label,
                                     fillColor = ~ Col,fragmentShaderSource = "point")

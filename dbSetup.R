@@ -5,6 +5,45 @@ library(sf)
 drv <- dbDriver("PostgreSQL")
 con <- dbConnect(drv, user = "postgres", password = "PowerOfBEC", host = "138.197.168.220", 
                  port = 5432, dbname = "spp_feas")
+dbSafeNames = function(names) {
+  names = gsub('[^a-z0-9]+','_',tolower(names))
+  names = make.names(names, unique=TRUE, allow_=TRUE)
+  names = gsub('.','_',names, fixed=TRUE)
+  names
+}
+
+##offsite trial tables
+site <- fread("Trial_Site_Info.csv")
+planting <-  fread("Trial_Planting_Info.csv")
+setnames(site, dbSafeNames(colnames(site)))
+setnames(planting, dbSafeNames(colnames(planting)))
+site[,snr := as.character(snr)]
+#planting[,sppvar := tolower(sppvar)]
+capwords <- function(s, strict = FALSE) {
+  cap <- function(s) paste(toupper(substring(s, 1, 1)),
+                           {s <- substring(s, 2); if(strict) tolower(s) else s},
+                           sep = "", collapse = " " )
+  sapply(strsplit(s, split = " "), cap, USE.NAMES = !is.null(names(s)))
+}
+planting[,spp := capwords(sppvar,strict = T)]
+planting[,sppvar:= capwords(sppvar,strict = T)]
+planting[sppvar %in% c("Fdi","Fdc"),spp := "Fd"]
+planting[sppvar %in% c("Pli","Plc"),spp := "Pl"]
+planting[sppvar %in% c("Sw","Se","Sxw"),spp := "Sx"]
+planting[sppvar %in% c("Ss", "Sxl","Sxs"),spp := "Ss"]
+planting[sppvar %in% c("Pyi","Pyc"),spp := "Py"]
+planting[sppvar %in% c("Acb","Act"),spp := "Ac"]
+planting[is.na(assessor_qual) | assessor_qual == "", assessor_qual := "UN"]
+
+site <- st_as_sf(site, coords = c("longitude","latitude"), 
+                 crs = 4326, agr = "constant")
+plot(site["trial_id"])
+st_write(site, con, "offsite_site", row.names = F)
+dbWriteTable(con,"offsite_planting",planting, row.names = F)
+dbExecute(con,"create index on offsite_planting(trial_id)")
+dbExecute(con,"create index on offsite_site(trial_id)")
+
+
 
 ##update forest health
 #fh <- dbGetQuery(con,"select * from forhealth_backup")
@@ -38,12 +77,7 @@ newfh <- unique(newfh)
 dbExecute(con,"drop table forhealth")
 dbWriteTable(con,"forhealth",newfh,row.names = F)
 #########################
-dbSafeNames = function(names) {
-  names = gsub('[^a-z0-9]+','_',tolower(names))
-  names = make.names(names, unique=TRUE, allow_=TRUE)
-  names = gsub('.','_',names, fixed=TRUE)
-  names
-}
+
 
 feas <- fread("./inputs/Feasibility_v12_12.csv")
 feas <- feas[,.(BGC,SS_NoSpace,SppVar,Feasible)]
