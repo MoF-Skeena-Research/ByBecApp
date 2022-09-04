@@ -119,14 +119,12 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                  )
                              ),
                              fluidRow(
-                                 column(6,
+                                 column(12,
                                         selectInput("trialSelect",
                                                     label = "Select a trial, or click on map",
                                                     choices = NULL),
                                         h3("Site Info"),
-                                        rHandsontableOutput("offsite_site")
-                                        ),
-                                 column(6,
+                                        rHandsontableOutput("offsite_site"),
                                         h3("Planting Info"),
                                         rHandsontableOutput("offsite_planting")
                                         )

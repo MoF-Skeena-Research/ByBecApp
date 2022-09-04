@@ -9,12 +9,14 @@ observeEvent(input$showinstr_offsite,{
 
 observeEvent(input$tabs,{
   if(input$tabs == "tab2"){
-    sppData <- dbGetQuery(sppDb, "select distinct spp from offsite")[,1]
+    proj_names <- dbGetQuery(sppDb, "select distinct project_name from offsite_site")[,1]
+    updatePickerInput(session, "trialType", choices = proj_names, selected = proj_names)
+    sppData <- dbGetQuery(sppDb, "select distinct spp from offsite_planting")[,1]
     sppList2 <- sppList
     for(i in 1:length(sppList2)){
       sppList2[[i]] <- sppList2[[i]][substr(sppList2[[i]],1,2) %in% substr(sppData,1,2)]
     }
-    updatePickerInput(session, "sppPick2", choices = sppList2, )
+    updatePickerInput(session, "sppPick2", choices = sppList2)
     
     output$offsiteMap <- renderLeaflet({
       leaflet() %>%
@@ -59,7 +61,7 @@ observeEvent(input$tabs,{
 observeEvent(input$trialSelect,{
   output$offsite_site <- renderRHandsontable({
     if(input$trialSelect != ""){
-      dat <- setDT(dbGetQuery(sppDb,paste0("select trial_id,trial_type,plantingyear,bgc,ss_nospace from offsite_site where trial_id = '",
+      dat <- setDT(dbGetQuery(sppDb,paste0("select trial_id,project_name,sppcomposition_label,plantingdate,bgc,ss_nospace from offsite_site where trial_id = '",
                                      input$trialSelect,"'")))
       rhandsontable(dat)
     }
@@ -132,30 +134,50 @@ observeEvent({c(input$trialType,
                 input$trialStart2,
                 input$sppPick2,
                 input$multiSppTrial)},{
-                  if(!is.null(input$trialType) & !is.null(input$sppPick2)){
+                  if(!is.null(input$trialType)){
                     #browser()
                     if(input$multiSppTrial){
-       
-                        dat2 <- st_read(sppDb,query = paste0("select offsite_planting.trial_id, spp, trial_type, assessor_qual, geometry 
+                      if(input$trialStart2[1] == minStart & input$trialStart2[2] == maxStart){
+                        dat2 <- st_read(sppDb,query = paste0("select offsite_planting.trial_id, spp, project_name, assessor_qual, geometry 
                                                              from offsite_planting 
                                                              join offsite_site using (trial_id) 
-                                                             where trial_type in ('",paste(input$trialType,collapse = "','"),
-                                                           "') and plantingyear > ", as.integer(format(input$trialStart2[1],format = "%Y"))," and plantingyear < ",as.integer(format(input$trialStart2[2],format = "%Y")),
-                                                           " and spp in ('", paste(substr(input$sppPick2,1,2),collapse = "','"),
-                                                           "') and trial_id in (select trial_id from offsite_planting group by trial_id having count(distinct spp) > 1)"))
+                                                             where project_name in ('",paste(input$trialType,collapse = "','"),
+                                                             "') and spp in ('", paste(substr(input$sppPick2,1,2),collapse = "','"),
+                                                             "') and trial_id in (select trial_id from offsite_planting group by trial_id having count(distinct spp) > 1)"))
+                      }else{
+                        dat2 <- st_read(sppDb,query = paste0("select offsite_planting.trial_id, spp, project_name, assessor_qual, geometry 
+                                                             from offsite_planting 
+                                                             join offsite_site using (trial_id) 
+                                                             where project_name in ('",paste(input$trialType,collapse = "','"),
+                                                             "') and plantingyear > '", input$trialStart2[1],"' and plantingyear < '",input$trialStart2[2],
+                                                             "' and spp in ('", paste(substr(input$sppPick2,1,2),collapse = "','"),
+                                                             "') and trial_id in (select trial_id from offsite_planting group by trial_id having count(distinct spp) > 1)"))
+                      }
                     }else{ ### need to join both to get trial type, 
-                        dat2 <- st_read(sppDb,query = paste0("select offsite_planting.trial_id, spp, trial_type, assessor_qual, geometry 
+                      if(input$trialStart2[1] == minStart & input$trialStart2[2] == maxStart){
+                        dat2 <- st_read(sppDb,query = paste0("select offsite_planting.trial_id, spp, project_name, assessor_qual, geometry 
                                                              from offsite_planting 
                                                              join offsite_site using (trial_id) 
-                                                             where trial_type in ('",paste(input$trialType,collapse = "','"),
-                                                             "') and plantingyear > ", as.integer(format(input$trialStart2[1],format = "%Y"))," and plantingyear < ",as.integer(format(input$trialStart2[2],format = "%Y")),
-                                                             " and spp in ('", paste(substr(input$sppPick2,1,2),collapse = "','"),
+                                                             where project_name in ('",paste(input$trialType,collapse = "','"),
+                                                             "') and spp in ('", paste(substr(input$sppPick2,1,2),collapse = "','"),
                                                              "')"))
+                      }else{
+                        dat2 <- st_read(sppDb,query = paste0("select offsite_planting.trial_id, spp, project_name, assessor_qual, geometry 
+                                                             from offsite_planting 
+                                                             join offsite_site using (trial_id) 
+                                                             where project_name in ('",paste(input$trialType,collapse = "','"),
+                                                             "') and plantingyear > '", input$trialStart2[1],"' and plantingyear < '",input$trialStart2[2],
+                                                             "' and spp in ('", paste(substr(input$sppPick2,1,2),collapse = "','"),
+                                                             "')"))
+                      }
                     }
                     
                     if(nrow(dat2) == 0){
                       dat2 <- NULL
+                      leafletProxy("offsiteMap") %>%
+                        removeGlPoints("tree_trial")
                     }else{
+                      #browser()
                       plotLocs <- unique(dat2["trial_id"])
                       dat <- as.data.table(st_drop_geometry(dat2))
                       # if(input$sppPick2 == "All"){
