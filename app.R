@@ -117,7 +117,7 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                  )
                              ),
                              fluidRow(
-                                 column(12,
+                                 column(10,
                                         selectInput("trialSelect",
                                                     label = "Select a trial, or click on map",
                                                     choices = NULL),
