@@ -98,10 +98,8 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                         pickerInput("trialType",
                                                     #label = "Select Species",
                                                     #choices = offsiteProj,
-                                                    choices = c("Research", "AMAT", "RESULTS", 
-                                                                "General Offsite", "Operational"),
-                                                    selected = c("Research", "AMAT", "RESULTS", 
-                                                                 "General Offsite", "Operational"),
+                                                    choices = c("Research", "Operational", "Other"),
+                                                    selected = c("Research", "Operational", "Other"),
                                                     multiple = TRUE,
                                                     options = pickerOptions(actionsBox = T)),
                                         
@@ -126,7 +124,9 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                         h3("Site Info"),
                                         rHandsontableOutput("offsite_site"),
                                         h3("Planting Info"),
-                                        rHandsontableOutput("offsite_planting")
+                                        rHandsontableOutput("offsite_planting"),
+                                        actionButton("submitAss","Submit Assessment?"),
+                                        actionButton("addoffsite","Add New Trial?")
                                         )
                              )
                              

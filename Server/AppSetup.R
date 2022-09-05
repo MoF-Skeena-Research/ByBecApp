@@ -111,6 +111,9 @@ maxStart <- dbGetQuery(sppDb,"select max(planted) from offsite")[1,1]
 
 offsiteNames <- dbGetQuery(sppDb,"select distinct plotid from offsite")[,1]
 offsiteProj <- dbGetQuery(sppDb,"select distinct project_id from offsite")[,1]
+offsiteTrials <- dbGetQuery(sppDb, "select trial_id from offsite_site")[,1]
+sitenames <- as.data.table(st_read(sppDb, query = "select * from offsite_site limit 1"))
+plantingnames <- as.data.table(dbGetQuery(sppDb, "select * from offsite_planting limit 0"))
 ##max suitability colours
 ##BGC colours
 zones <- fread("inputs/BGCZones.csv")

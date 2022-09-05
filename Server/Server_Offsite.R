@@ -9,14 +9,14 @@ observeEvent(input$showinstr_offsite,{
 
 observeEvent(input$tabs,{
   if(input$tabs == "tab2"){
-    proj_names <- dbGetQuery(sppDb, "select distinct project_name from offsite_site")[,1]
+    proj_names <- dbGetQuery(sppDb, "select distinct trial_type from offsite_site")[,1]
     updatePickerInput(session, "trialType", choices = proj_names, selected = proj_names)
     sppData <- dbGetQuery(sppDb, "select distinct spp from offsite_planting")[,1]
     sppList2 <- sppList
     for(i in 1:length(sppList2)){
       sppList2[[i]] <- sppList2[[i]][substr(sppList2[[i]],1,2) %in% substr(sppData,1,2)]
     }
-    updatePickerInput(session, "sppPick2", choices = sppList2)
+    updatePickerInput(session, "sppPick2", choices = sppList2,selected = sppList2[[1]][5])
     
     output$offsiteMap <- renderLeaflet({
       leaflet() %>%
@@ -58,6 +58,114 @@ observeEvent(input$tabs,{
   }
 })
 
+observeEvent(input$addoffsite,{
+  shinyalert(html = T,
+            text = tagList(
+              h2("Add New Data"),
+              actionButton("addSite","Add New Trial"),
+              actionButton("addPlanting","Add New Planting")
+            ),
+            showCancelButton = T,
+            showConfirmButton = F,
+            closeOnClickOutside = T
+            )
+})
+
+observeEvent(input$addSite,{
+  closeAlert()
+  showModal(modalDialog(
+               h2("Trial ID"),
+               textInput("newtrial_id", "Enter Trial ID"),
+               h2("Site Info"),
+               rHandsontableOutput("blanksite"),
+               h2("Planting Info"),
+               rHandsontableOutput("blankplant"),
+               actionButton("submitoffsite_site","Submit to Database"),
+               size = "xl"
+             ))
+})
+
+observeEvent(input$submitoffsite_site,{
+  site <- as.data.table(hot_to_r(input$blanksite))
+  site[,trial_id := input$newtrial_id]
+  site <- as.data.table(st_as_sf(site, coords = c("Long","Lat"), 
+                   crs = 4326, agr = "constant"))
+  site2 <- rbind(sitenames, site, fill = T)
+  site2 <- st_as_sf(site2[-1,])
+  st_write(site2, sppDb,"offsite_site",append = T, row.names = F)
+  plant <- as.data.table(hot_to_r(input$blankplant))
+  if(nrow(plant) > 0){
+    plant[,trial_id := input$newtrial_id]
+    plant[,spp := substr(sppvar,1,2)]
+    plant2 <- rbind(plantingnames,plant, fill =  T)
+    dbAppendTable(sppDb,"offsite_planting",plant2)
+  }
+  removeModal()
+})
+
+observeEvent(input$addPlanting,{
+  closeAlert()
+  # updateSelectizeInput(session,"trialaddSelect",choices = offsiteTrials,
+  #                      server = TRUE)
+  showModal(modalDialog(
+               h2("Select Site"),
+               selectInput("trialaddSelect",
+                           label = "Select a trial",
+                           choices = offsiteTrials),
+               h2("Planting Table"),
+               rHandsontableOutput("newplanting"),
+               actionButton("submitoffsite_planting","Submit to Database"),
+               size = "xl"
+             ))
+})
+
+observeEvent(input$submitoffsite_planting,{
+  datOrig <- setDT(dbGetQuery(sppDb,paste0("select * from offsite_planting
+                                         where trial_id = '",input$trialaddSelect,"'")))
+  plant <- as.data.table(hot_to_r(input$newplanting))
+  if(nrow(datOrig) > 0){
+    plant <- plant[-c(1:nrow(datOrig)),]
+    plant[,trial_id := input$trialaddSelect]
+    plant[,spp := substr(sppvar,1,2)]
+    plant2 <- rbind(plantingnames,plant, fill =  T)
+    dbAppendTable(sppDb,"offsite_planting",plant2)
+  }
+  removeModal()
+})
+
+
+observeEvent(input$trialaddSelect,{
+  output$newplanting <- renderRHandsontable({
+    if(!is.null(input$trialaddSelect)){
+      dat <- setDT(dbGetQuery(sppDb,paste0("select * from offsite_planting
+                                         where trial_id = '",input$trialaddSelect,"'")))
+      print(dat)
+      rhandsontable(dat) %>%
+        hot_table(minSpareRows = 1)
+    }
+  })
+})
+##
+
+
+  output$blanksite <- renderRHandsontable({
+    dat <- setDT(dbGetQuery(sppDb,"select sppcomposition_label, project_name, trial_type, elevation, slope, aspect, bgc, ss_nospace, smr, snr,plantingseason from offsite_site limit 0"))
+    datTemp <- data.table(Lat = numeric(),Long = numeric())
+    dat <- cbind(datTemp, dat)
+    rhandsontable(dat) %>%
+      hot_table(minSpareRows = 1)
+  })
+  
+  output$blankplant <- renderRHandsontable({
+    dat <- setDT(dbGetQuery(sppDb,"select sppvar, seedlots, seed_class, stocktype, num_planted, assessor_qual, qual_date, qualitative_vigour, siteindex from offsite_planting limit 0"))
+    rhandsontable(dat) %>%
+      hot_table(minSpareRows = 1)
+  })
+
+# observeEvent(input$addoffsite,{
+#   shinyalert("Select location or enter manually?",)
+# })
+
 observeEvent(input$trialSelect,{
   output$offsite_site <- renderRHandsontable({
     if(input$trialSelect != ""){
@@ -83,16 +191,15 @@ observeEvent(input$trialSelect,{
 
 ##this part will need to be fixed
 observeEvent(input$submitAss,{
-  dat <- as.data.table(hot_to_r(input$assIn))
-  dat[,mod := input$assessMod]
+  dat <- as.data.table(hot_to_r(input$offsite_planting))
+  ##dat[,mod := input$assessMod]
   dbWriteTable(sppDb, "temp_ass_update", dat, overwrite = T)
-  dbExecute(sppDb,"UPDATE offsite
-                  SET assessment = temp_ass_update.assessment,
-                  mod = temp_ass_update.mod
+  dbExecute(sppDb,"UPDATE offsite_planting
+                  SET assessor_qual = temp_ass_update.assessor_qual
                   FROM temp_ass_update
-                  WHERE offsite.plotid = temp_ass_update.plotid
-                  AND offsite.spp = temp_ass_update.spp
-                  AND offsite.seedlot = temp_ass_update.seedlot")
+                  WHERE offsite_planting.trial_id = temp_ass_update.trial_id
+                  AND offsite_planting.spp = temp_ass_update.spp
+                  AND offsite_planting.seedlots = temp_ass_update.seedlots")
   shinyalert("Thank you!","Your updates have been recorded", type = "info", inputId = "assMessage")
 })
 
@@ -138,34 +245,34 @@ observeEvent({c(input$trialType,
                     #browser()
                     if(input$multiSppTrial){
                       if(input$trialStart2[1] == minStart & input$trialStart2[2] == maxStart){
-                        dat2 <- st_read(sppDb,query = paste0("select offsite_planting.trial_id, spp, project_name, assessor_qual, geometry 
+                        dat2 <- st_read(sppDb,query = paste0("select offsite_planting.trial_id, spp, trial_type, assessor_qual, geometry 
                                                              from offsite_planting 
                                                              join offsite_site using (trial_id) 
-                                                             where project_name in ('",paste(input$trialType,collapse = "','"),
+                                                             where trial_type in ('",paste(input$trialType,collapse = "','"),
                                                              "') and spp in ('", paste(substr(input$sppPick2,1,2),collapse = "','"),
                                                              "') and trial_id in (select trial_id from offsite_planting group by trial_id having count(distinct spp) > 1)"))
                       }else{
-                        dat2 <- st_read(sppDb,query = paste0("select offsite_planting.trial_id, spp, project_name, assessor_qual, geometry 
+                        dat2 <- st_read(sppDb,query = paste0("select offsite_planting.trial_id, spp, trial_type, assessor_qual, geometry 
                                                              from offsite_planting 
                                                              join offsite_site using (trial_id) 
-                                                             where project_name in ('",paste(input$trialType,collapse = "','"),
+                                                             where trial_type in ('",paste(input$trialType,collapse = "','"),
                                                              "') and plantingyear > '", input$trialStart2[1],"' and plantingyear < '",input$trialStart2[2],
                                                              "' and spp in ('", paste(substr(input$sppPick2,1,2),collapse = "','"),
                                                              "') and trial_id in (select trial_id from offsite_planting group by trial_id having count(distinct spp) > 1)"))
                       }
                     }else{ ### need to join both to get trial type, 
                       if(input$trialStart2[1] == minStart & input$trialStart2[2] == maxStart){
-                        dat2 <- st_read(sppDb,query = paste0("select offsite_planting.trial_id, spp, project_name, assessor_qual, geometry 
+                        dat2 <- st_read(sppDb,query = paste0("select offsite_planting.trial_id, spp, trial_type, assessor_qual, geometry 
                                                              from offsite_planting 
                                                              join offsite_site using (trial_id) 
-                                                             where project_name in ('",paste(input$trialType,collapse = "','"),
+                                                             where trial_type in ('",paste(input$trialType,collapse = "','"),
                                                              "') and spp in ('", paste(substr(input$sppPick2,1,2),collapse = "','"),
                                                              "')"))
                       }else{
-                        dat2 <- st_read(sppDb,query = paste0("select offsite_planting.trial_id, spp, project_name, assessor_qual, geometry 
+                        dat2 <- st_read(sppDb,query = paste0("select offsite_planting.trial_id, spp, trial_type, assessor_qual, geometry 
                                                              from offsite_planting 
                                                              join offsite_site using (trial_id) 
-                                                             where project_name in ('",paste(input$trialType,collapse = "','"),
+                                                             where trial_type in ('",paste(input$trialType,collapse = "','"),
                                                              "') and plantingyear > '", input$trialStart2[1],"' and plantingyear < '",input$trialStart2[2],
                                                              "' and spp in ('", paste(substr(input$sppPick2,1,2),collapse = "','"),
                                                              "')"))
