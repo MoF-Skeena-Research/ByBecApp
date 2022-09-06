@@ -249,9 +249,10 @@ observeEvent(input$trialSelect,{
 observeEvent(input$submitAss,{
   dat <- as.data.table(hot_to_r(input$offsite_planting))
   ##dat[,mod := input$assessMod]
+  #print(dat)
   dbWriteTable(sppDb, "temp_ass_update", dat, overwrite = T)
   dbExecute(sppDb,"UPDATE offsite_planting
-                  SET assessor_name_qual = temp_ass_update.assessor_name_qual
+                  SET qualitative_vigour = temp_ass_update.qualitative_vigour
                   FROM temp_ass_update
                   WHERE offsite_planting.trial_id = temp_ass_update.trial_id
                   AND offsite_planting.spp = temp_ass_update.spp
@@ -259,10 +260,11 @@ observeEvent(input$submitAss,{
   shinyalert("Thank you!","Your updates have been recorded", type = "info", inputId = "assMessage")
 })
 
-observeEvent(input$offsiteMap_glify_click,{
-  val <- input$offsiteMap_glify_click$data
-  nme <- gsub("Name: ","",val)
-  updateSelectInput(session,"trialSelect",selected = nme)
+observeEvent(input$offsiteMap_marker_click,{
+  val <- input$offsiteMap_marker_click
+  #print(val)
+  #nme <- gsub("Name: ","",val)
+  updateSelectInput(session,"trialSelect",selected = val$id)
 })
 
 
@@ -292,6 +294,8 @@ observeEvent({c(input$trialType,
                 input$trialStart2,
                 input$sppPick2,
                 input$multiSppTrial)},{
+                  leafletProxy("offsiteMap") %>%
+                    clearMarkers()
                   if(!is.null(input$trialType)){
                     #browser()
                     if(input$multiSppTrial){
@@ -345,21 +349,34 @@ observeEvent({c(input$trialType,
                       dat[,qualitative_vigour := as.character(qualitative_vigour)]
                       dat[is.na(qualitative_vigour), qualitative_vigour := "UN"]
                       dat[assID, ID := i.ID, on = c(qualitative_vigour = "assessment")]
-                      dat <- dat[,.(ID = max(ID)), by = .(trial_id,spp)]
+                      dat <- dat[,.(ID = max(ID)), by = .(trial_id,spp,trial_type)]
                       dat[assCols, Col := i.Col, on = "ID"]
                       
                       dat[,label := paste0("Name: ",trial_id)]
-                      dat <- dat[,.(trial_id,label,Col)]
+                      #dat <- dat[,.(trial_id,label,Col,trial_type)]
                       dat[,Col := as.character(Col)]
                       updateSelectInput(session,"trialSelect",choices = unique(dat$trial_id))
-                      plotLocs <- merge(plotLocs, dat, by = "trial_id")
-                      leafletProxy("offsiteMap") %>%
-                        addGlPoints(data = plotLocs,layerId = "tree_trial",popup = ~ label,
-                                    fillColor = ~ Col,fragmentShaderSource = "point")
+                      plotLocs <- st_as_sf(merge(plotLocs, dat, by = "trial_id"))
+                      print(names(plotLocs))
+                      # observeEvent(input$offsiteMap_zoom,{
+                      #   print(input$offsiteMap_zoom)
+                        leafletProxy("offsiteMap") %>%
+                          addCircleMarkers(data = plotLocs,
+                                           radius = ~ifelse(trial_type == "Research", 8, 6),
+                                           stroke = F,
+                                           fillOpacity = 0.9,
+                                           group = "tree_trial",
+                                           color = ~ Col,
+                                           layerId = ~ trial_id,
+                                           #popup = ~ label,
+                                           label = ~ label)
+                        # addGlPoints(data = plotLocs,layerId = "tree_trial",popup = ~ label,
+                        #             fillColor = ~ Col,fragmentShaderSource = "point")
+                      #})
+                      
                     }
-                  }else{
-                    leafletProxy("offsiteMap") %>%
-                      removeGlPoints("tree_trial")
                   }
+                    
                 })
+
 ###end offsite tab##
