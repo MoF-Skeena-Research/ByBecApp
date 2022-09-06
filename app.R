@@ -83,7 +83,7 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                     ),
                     tabPanel(value = "tab2", title = "Off-site Trials",
                              fluidRow(
-                                 column(3,
+                                 column(4,
                                         h3("Select Tree Species"),
                                         pickerInput("sppPick2",
                                                     choices = sppList,
@@ -107,17 +107,7 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                         sliderInput("trialStart2", "",
                                                     min = minStart, max = maxStart, value = c(minStart,maxStart)),
                                         br(),
-                                        hr()
-  
-                                 ),
-                                 column(9,
-                                        actionButton("showinstr_offsite","Click To Show Instructions"),
-                                        leafglOutput("offsiteMap", height = "70vh"),
-                                        
-                                 )
-                             ),
-                             fluidRow(
-                                 column(10,
+                                        hr(),
                                         selectInput("trialSelect",
                                                     label = "Select a trial, or click on map",
                                                     choices = NULL),
@@ -127,7 +117,13 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                         rHandsontableOutput("offsite_planting"),
                                         actionButton("submitAss","Submit Assessment?"),
                                         actionButton("addoffsite","Add New Trial?")
-                                        )
+  
+                                 ),
+                                 column(8,
+                                        actionButton("showinstr_offsite","Click To Show Instructions"),
+                                        leafglOutput("offsiteMap", height = "70vh"),
+                                        
+                                 )
                              )
                              
                     ),
@@ -379,6 +375,7 @@ server <- function(input, output, session) {
     globalLeg <- reactiveValues(Legend = climaticLeg)
     globalSelBEC <- reactiveVal()
     globalAddTrial <- reactiveValues(data = trialInit)
+    globalLatLong <- reactiveValues(lat = NA_real_, long = NA_real_, useMap = F)
     climsumInputs <- reactiveValues()
     climsumCols <- reactiveValues(Data = data.table())
     climsumExtreme <- reactiveValues()

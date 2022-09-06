@@ -59,33 +59,82 @@ observeEvent(input$tabs,{
 })
 
 observeEvent(input$addoffsite,{
-  shinyalert(html = T,
-            text = tagList(
+  globalLatLong$lat <- NA_real_
+  globalLatLong$long <- NA_real_
+  showModal(modalDialog(
               h2("Add New Data"),
               actionButton("addSite","Add New Trial"),
               actionButton("addPlanting","Add New Planting")
-            ),
-            showCancelButton = T,
-            showConfirmButton = F,
-            closeOnClickOutside = T
+            )
             )
 })
 
-observeEvent(input$addSite,{
-  closeAlert()
-  showModal(modalDialog(
-               h2("Trial ID"),
-               textInput("newtrial_id", "Enter Trial ID"),
-               h2("Site Info"),
-               rHandsontableOutput("blanksite"),
-               h2("Planting Info"),
-               rHandsontableOutput("blankplant"),
-               actionButton("submitoffsite_site","Submit to Database"),
-               size = "xl"
-             ))
+observeEvent(input$offsiteMap_click,{
+  if(globalLatLong$useMap){
+    globalLatLong$lat <- input$offsiteMap_click$lat
+    globalLatLong$long <- input$offsiteMap_click$lng
+    globalLatLong$useMap <- F
+    showModal(modalDialog(
+      h2("Trial ID"),
+      textInput("newtrial_id", "Enter Trial ID"),
+      h2("Site Info"),
+      rHandsontableOutput("blanksite"),
+      h2("Planting Info"),
+      rHandsontableOutput("blankplant"),
+      actionButton("submitoffsite_site","Submit to Database"),
+      size = "xl"
+    ))
+    
+  }
+  
 })
 
+observeEvent(input$usemapno,{
+  closeAlert()
+  showModal(modalDialog(
+    h2("Trial ID"),
+    textInput("newtrial_id", "Enter Trial ID"),
+    h2("Site Info"),
+    rHandsontableOutput("blanksite"),
+    h2("Planting Info"),
+    rHandsontableOutput("blankplant"),
+    actionButton("submitoffsite_site","Submit to Database"),
+    size = "xl"
+  ))
+})
+
+observeEvent(input$addSite,{
+  #closeAlert()
+  showModal(modalDialog(
+    actionButton("usemap","Select location on Map?"),
+    actionButton("usemapno","Enter location Manually")
+  ))
+  
+})
+
+observeEvent(input$usemap,{
+  #browser()
+  #closeAlert()
+  removeModal()
+  globalLatLong$useMap <- T
+})
+
+# observeEvent(input$addSite,{
+#   closeAlert()
+#   showModal(modalDialog(
+#                h2("Trial ID"),
+#                textInput("newtrial_id", "Enter Trial ID"),
+#                h2("Site Info"),
+#                rHandsontableOutput("blanksite"),
+#                h2("Planting Info"),
+#                rHandsontableOutput("blankplant"),
+#                actionButton("submitoffsite_site","Submit to Database"),
+#                size = "xl"
+#              ))
+# })
+
 observeEvent(input$submitoffsite_site,{
+  
   site <- as.data.table(hot_to_r(input$blanksite))
   site[,trial_id := input$newtrial_id]
   site <- as.data.table(st_as_sf(site, coords = c("Long","Lat"), 
@@ -100,6 +149,8 @@ observeEvent(input$submitoffsite_site,{
     plant2 <- rbind(plantingnames,plant, fill =  T)
     dbAppendTable(sppDb,"offsite_planting",plant2)
   }
+  globalLatLong$lat <- NA_real_
+  globalLatLong$long <- NA_real_
   removeModal()
 })
 
@@ -149,15 +200,19 @@ observeEvent(input$trialaddSelect,{
 
 
   output$blanksite <- renderRHandsontable({
-    dat <- setDT(dbGetQuery(sppDb,"select sppcomposition_label, project_name, trial_type, elevation, slope, aspect, bgc, ss_nospace, smr, snr, plantingseason from offsite_site limit 0"))
-    datTemp <- data.table(Lat = numeric(),Long = numeric())
+    dat <- setDT(dbGetQuery(sppDb,"select * from offsite_site limit 1"))
+    dat[,geometry := NULL]
+    dat[,trial_id := NULL]
+    dat[1,] <- NA
+    datTemp <- data.table(Lat = globalLatLong$lat,Long = globalLatLong$long)
     dat <- cbind(datTemp, dat)
-    rhandsontable(dat) %>%
-      hot_table(minSpareRows = 1)
+    
+    rhandsontable(dat) 
   })
   
   output$blankplant <- renderRHandsontable({
-    dat <- setDT(dbGetQuery(sppDb,"select sppvar, seedlots, seed_class, stocktype, num_planted, assessor_name_qual,assessment_date_qual, qualitative_vigour, siteindex from offsite_planting limit 0"))
+    dat <- setDT(dbGetQuery(sppDb,"select * from offsite_planting limit 0"))
+    dat[,trial_id := NULL]
     rhandsontable(dat) %>%
       hot_table(minSpareRows = 1)
   })
@@ -169,21 +224,22 @@ observeEvent(input$trialaddSelect,{
 observeEvent(input$trialSelect,{
   output$offsite_site <- renderRHandsontable({
     if(input$trialSelect != ""){
-      dat <- setDT(dbGetQuery(sppDb,paste0("select trial_id,project_name,sppcomposition_label,plantingyear,bgc from offsite_site where trial_id = '",
+      dat <- setDT(dbGetQuery(sppDb,paste0("select trial_id,project_name,trial_type,
+                                           plantingyear,bgc,ss_nospace,elevation 
+                                           from offsite_site where trial_id = '",
                                      input$trialSelect,"'")))
-      rhandsontable(dat)
+      rhandsontable(dat,colHeaders = c("Trial_ID","Project","Trial","Planting Year","BGC",
+                                       "Site Series","Elevation"))
     }
   })
-})
 
-observeEvent(input$trialSelect,{
   output$offsite_planting <- renderRHandsontable({
     if(input$trialSelect != ""){
-      dat <- setDT(dbGetQuery(sppDb,paste0("select trial_id, spp, seedlots, assessor_name_qual, assessment_date_qual, qualitative_vigour
+      dat <- setDT(dbGetQuery(sppDb,paste0("select trial_id, spp, seedlots,num_planted, qualitative_vigour
                                            from offsite_planting where trial_id = '", 
                                            input$trialSelect,"'")))
-      rhandsontable(dat) %>%
-        hot_col("qualitative_vigour", type = "dropdown", 
+      rhandsontable(dat,colHeaders = c("Trial_ID","Spp","Seedlots","Number Planted","Assessed Vigour")) %>%
+        hot_col("Assessed Vigour", type = "dropdown", 
                 source = c("Fail","Poor","Fair","Good","Excellent","UN"),strict = T)
     }
   })
@@ -217,12 +273,7 @@ observeEvent(input$offsiteMap_glify_click,{
 #             source = c("Fail","Poor","Fair","Good","Excellent","UN"),strict = T)
 # })
 
-observeEvent(input$offsiteMap_click,{
-  lat <- input$offsiteMap_click$lat
-  long <- input$offsiteMap_click$lng
-  updateTextInput(session,"addTr_lat",value = lat)
-  updateTextInput(session, "addTr_long", value = long)
-})
+
 
 observeEvent(input$submitTrial,{
   dat <- as.data.table(hot_to_r(input$addTrial))
