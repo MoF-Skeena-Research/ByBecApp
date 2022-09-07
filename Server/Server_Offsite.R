@@ -207,7 +207,8 @@ observeEvent(input$trialaddSelect,{
     datTemp <- data.table(Lat = globalLatLong$lat,Long = globalLatLong$long)
     dat <- cbind(datTemp, dat)
     
-    rhandsontable(dat) 
+    rhandsontable(dat) %>%
+      hot_cols(format = "0.000000")
   })
   
   output$blankplant <- renderRHandsontable({
@@ -221,38 +222,59 @@ observeEvent(input$trialaddSelect,{
 #   shinyalert("Select location or enter manually?",)
 # })
 
-observeEvent(input$trialSelect,{
+
   output$offsite_site <- renderRHandsontable({
     if(input$trialSelect != ""){
-      dat <- setDT(dbGetQuery(sppDb,paste0("select trial_id,project_name,trial_type,
+      if(input$completeOffsite){
+        dat <- setDT(dbGetQuery(sppDb,paste0("select * 
+                                           from offsite_site where trial_id = '",
+                                             input$trialSelect,"'")))
+        dat[,geometry := NULL]
+        rhandsontable(dat)
+      }else{
+        dat <- setDT(dbGetQuery(sppDb,paste0("select trial_id,project_name,trial_type,
                                            plantingyear,bgc,ss_nospace,elevation 
                                            from offsite_site where trial_id = '",
-                                     input$trialSelect,"'")))
-      rhandsontable(dat,colHeaders = c("Trial_ID","Project","Trial","Planting Year","BGC",
-                                       "Site Series","Elevation"))
+                                             input$trialSelect,"'")))
+        rhandsontable(dat,colHeaders = c("Trial_ID","Project","Trial","Planting Year","BGC",
+                                         "Site Series","Elevation"))
+      }
+      
     }
   })
 
   output$offsite_planting <- renderRHandsontable({
     if(input$trialSelect != ""){
-      dat <- setDT(dbGetQuery(sppDb,paste0("select trial_id, spp, seedlots,num_planted, qualitative_vigour
+      if(input$completeOffsite){
+        dat <- setDT(dbGetQuery(sppDb,paste0("select *
                                            from offsite_planting where trial_id = '", 
-                                           input$trialSelect,"'")))
-      rhandsontable(dat,colHeaders = c("Trial_ID","Spp","Seedlots","Number Planted","Assessed Vigour")) %>%
-        hot_col("Assessed Vigour", type = "dropdown", 
-                source = c("Fail","Poor","Fair","Good","Excellent","UN"),strict = T)
+                                             input$trialSelect,"'")))
+        rhandsontable(dat) %>%
+          hot_col("qualitative_vigour", type = "dropdown", 
+                  source = c("Fail","Poor","Fair","Good","Excellent","UN"),strict = T)
+      }else{
+        dat <- setDT(dbGetQuery(sppDb,paste0("select trial_id, spp, seedlots,num_planted, qualitative_vigour, assessor_name_qual, qual_date
+                                           from offsite_planting where trial_id = '", 
+                                             input$trialSelect,"'")))
+        rhandsontable(dat,colHeaders = c("Trial_ID","Spp","Seedlots","Number Planted","Ass Vigour", "Ass Name","Ass Date")) %>%
+          hot_col("Ass Vigour", type = "dropdown", 
+                  source = c("Fail","Poor","Fair","Good","Excellent","UN"),strict = T)
+      }
+      
     }
   })
-})
 
-##this part will need to be fixed
+
 observeEvent(input$submitAss,{
   dat <- as.data.table(hot_to_r(input$offsite_planting))
   ##dat[,mod := input$assessMod]
   #print(dat)
+  
   dbWriteTable(sppDb, "temp_ass_update", dat, overwrite = T)
   dbExecute(sppDb,"UPDATE offsite_planting
-                  SET qualitative_vigour = temp_ass_update.qualitative_vigour
+                  SET qualitative_vigour = temp_ass_update.qualitative_vigour,
+                  assessor_name_qual = temp_ass_update.assessor_name_qual,
+                  qual_date = temp_ass_update.qual_date
                   FROM temp_ass_update
                   WHERE offsite_planting.trial_id = temp_ass_update.trial_id
                   AND offsite_planting.spp = temp_ass_update.spp

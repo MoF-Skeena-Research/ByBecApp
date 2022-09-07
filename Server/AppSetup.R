@@ -106,8 +106,8 @@ allSppNames <- substr(allSppNames,1,2)
 allSppNames <- unname(allSppNames)
 
 
-minStart <- dbGetQuery(sppDb,"select min(planted) from offsite")[1,1]
-maxStart <- dbGetQuery(sppDb,"select max(planted) from offsite")[1,1]
+minStart <- dbGetQuery(sppDb,"select min(plantingyear) from offsite_site")[1,1]
+maxStart <- dbGetQuery(sppDb,"select max(plantingyear) from offsite_site")[1,1]
 
 offsiteNames <- dbGetQuery(sppDb,"select distinct plotid from offsite")[,1]
 offsiteProj <- dbGetQuery(sppDb,"select distinct project_id from offsite")[,1]

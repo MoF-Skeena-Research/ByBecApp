@@ -13,7 +13,7 @@ dbSafeNames = function(names) {
 }
 
 ##offsite trial tables
-# dbExecute(con, "drop table offsite_site")
+ dbExecute(con, "drop table offsite_site")
 # dbExecute(con, "drop table offsite_planting")
 
 site <- fread("Trial_Site_Info.csv")
@@ -36,9 +36,9 @@ planting[sppvar %in% c("Sw","Se","Sxw"),spp := "Sx"]
 planting[sppvar %in% c("Ss", "Sxl","Sxs"),spp := "Ss"]
 planting[sppvar %in% c("Pyi","Pyc"),spp := "Py"]
 planting[sppvar %in% c("Acb","Act"),spp := "Ac"]
-planting[is.na(assessor_qual) | assessor_qual == "", assessor_qual := "UN"]
+#planting[is.na(assessor_qual) | assessor_qual == "", assessor_qual := "UN"]
 #test <- site[is.na(plantingyear) & !is.na(plantingdate),]
-site[,plantingyear := as.Date(paste0(plantingyear, "-01-01"))]
+#site[,plantingyear := as.Date(paste0(plantingyear, "-01-01"))]
 
 site <- st_as_sf(site, coords = c("longitude","latitude"), 
                  crs = 4326, agr = "constant")

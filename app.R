@@ -108,15 +108,6 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                                     min = minStart, max = maxStart, value = c(minStart,maxStart)),
                                         br(),
                                         hr(),
-                                        selectInput("trialSelect",
-                                                    label = "Select a trial, or click on map",
-                                                    choices = NULL),
-                                        h3("Site Info"),
-                                        rHandsontableOutput("offsite_site"),
-                                        h3("Planting Info"),
-                                        rHandsontableOutput("offsite_planting"),
-                                        actionButton("submitAss","Submit Assessment?"),
-                                        actionButton("addoffsite","Add New Trial?")
   
                                  ),
                                  column(8,
@@ -124,7 +115,17 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                         leafglOutput("offsiteMap", height = "70vh"),
                                         
                                  )
-                             )
+                             ),
+                             selectInput("trialSelect",
+                                         label = "Select a trial, or click on map",
+                                         choices = NULL),
+                             h3("Site Info"),
+                             checkboxInput("completeOffsite","Show Entire Table?",value = F),
+                             rHandsontableOutput("offsite_site"),
+                             h3("Planting Info"),
+                             rHandsontableOutput("offsite_planting"),
+                             actionButton("submitAss","Submit Assessment?"),
+                             actionButton("addoffsite","Add New Trial?")
                              
                     ),
                     # h3("Existing Trial Information"),
