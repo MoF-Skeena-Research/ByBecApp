@@ -12,6 +12,7 @@ library(RPostgres)
 library(shinyjs)
 library(leafgl)
 library(leaflet)
+library(leaflegend)
 library(colourvalues)
 library(shinythemes)
 library(gridExtra)
@@ -105,6 +106,12 @@ allSppNames <- unlist(sppList)
 allSppNames <- substr(allSppNames,1,2)
 allSppNames <- unname(allSppNames)
 
+##offsite
+sppData <- dbGetQuery(sppDb, "select distinct spp from offsite_planting")[,1]
+sppList2 <- sppList
+for(i in 1:length(sppList2)){
+  sppList2[[i]] <- sppList2[[i]][substr(sppList2[[i]],1,2) %in% substr(sppData,1,2)]
+}
 
 minStart <- dbGetQuery(sppDb,"select min(plantingyear) from offsite_site")[1,1]
 maxStart <- dbGetQuery(sppDb,"select max(plantingyear) from offsite_site")[1,1]

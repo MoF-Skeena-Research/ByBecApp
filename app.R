@@ -105,7 +105,7 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                         
                                         h4("Filter offsite trials by planting year:"),
                                         sliderInput("trialStart2", "",
-                                                    min = minStart, max = maxStart, value = c(minStart,maxStart)),
+                                                    min = minStart, max = maxStart, value = c(minStart,maxStart),sep = ""),
                                         br(),
                                         hr(),
                                         h4("Select Trial on Map or "), actionButton("addoffsite","Add New Trial"),

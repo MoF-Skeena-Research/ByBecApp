@@ -11,11 +11,7 @@ observeEvent(input$tabs,{
   if(input$tabs == "tab2"){
     proj_names <- dbGetQuery(sppDb, "select distinct trial_type from offsite_site")[,1]
     updatePickerInput(session, "trialType", choices = proj_names, selected = proj_names)
-    sppData <- dbGetQuery(sppDb, "select distinct spp from offsite_planting")[,1]
-    sppList2 <- sppList
-    for(i in 1:length(sppList2)){
-      sppList2[[i]] <- sppList2[[i]][substr(sppList2[[i]],1,2) %in% substr(sppData,1,2)]
-    }
+    
     updatePickerInput(session, "sppPick2", choices = sppList2,selected = sppList2[[1]][5])
     
     output$offsiteMap <- renderLeaflet({
@@ -62,11 +58,9 @@ observeEvent(input$addoffsite,{
   globalLatLong$lat <- NA_real_
   globalLatLong$long <- NA_real_
   showModal(modalDialog(
-              h2("Add New Data"),
-              actionButton("addSite","Add New Trial"),
-              actionButton("addPlanting","Add New Planting")
-            )
-            )
+    actionButton("usemap","Select location on Map?"),
+    actionButton("usemapno","Enter location Manually")
+  ))
 })
 
 observeEvent(input$offsiteMap_click,{
@@ -103,14 +97,6 @@ observeEvent(input$usemapno,{
   ))
 })
 
-observeEvent(input$addSite,{
-  #closeAlert()
-  showModal(modalDialog(
-    actionButton("usemap","Select location on Map?"),
-    actionButton("usemapno","Enter location Manually")
-  ))
-  
-})
 
 observeEvent(input$usemap,{
   #browser()
@@ -143,6 +129,7 @@ observeEvent(input$submitoffsite_site,{
   site2 <- st_as_sf(site2[-1,])
   st_write(site2, sppDb,"offsite_site",append = T, row.names = F)
   plant <- as.data.table(hot_to_r(input$blankplant))
+  plant <- plant[!is.na(spp) | !is.na(sppvar),]
   if(nrow(plant) > 0){
     plant[,trial_id := input$newtrial_id]
     plant[,spp := substr(sppvar,1,2)]
@@ -204,18 +191,26 @@ observeEvent(input$trialaddSelect,{
     dat[,geometry := NULL]
     dat[,trial_id := NULL]
     dat[1,] <- NA
+    print(str(dat))
     datTemp <- data.table(Lat = globalLatLong$lat,Long = globalLatLong$long)
     dat <- cbind(datTemp, dat)
-    
-    rhandsontable(dat) %>%
-      hot_cols(format = "0.000000")
+    rhandsontable(dat,overflow = "visible") %>%
+      hot_cols(format = "0.000000") %>%
+      hot_col("trial_type",type = "dropdown",
+              source = c("Research","Operational","Other"),
+              strict = T)
   })
   
   output$blankplant <- renderRHandsontable({
     dat <- setDT(dbGetQuery(sppDb,"select * from offsite_planting limit 0"))
     dat[,trial_id := NULL]
-    rhandsontable(dat) %>%
-      hot_table(minSpareRows = 1)
+    print(str(dat))
+    rhandsontable(dat,overflow = "visible") %>%
+      hot_table(minSpareRows = 1) %>%
+      hot_col("sppvar", type = "dropdown",source = sppData, strict = F) %>%
+      hot_col("spp", type = "dropdown",source = sppData, strict = F) %>%
+      hot_col("qualitative_vigour", type = "dropdown",
+              source = c("Excellent", "Good", "Fair", "Poor", "Fail", "UN"),strict = T)
   })
 
 # observeEvent(input$addoffsite,{
@@ -249,16 +244,24 @@ observeEvent(input$trialaddSelect,{
         dat <- setDT(dbGetQuery(sppDb,paste0("select *
                                            from offsite_planting where trial_id = '", 
                                              input$trialSelect,"'")))
-        rhandsontable(dat) %>%
+        rhandsontable(dat, overflow = "visible") %>%
           hot_col("qualitative_vigour", type = "dropdown", 
-                  source = c("Excellent", "Good", "Fair", "Poor", "Fail", "UN"),strict = T)
+                  source = c("Excellent", "Good", "Fair", "Poor", "Fail", "UN"),strict = T) %>%
+          hot_col("spp",type = "dropdown",
+                  source = sppData, strict = F) %>%
+          hot_col("sppvar",type = "dropdown",
+                  source = sppData, strict = F)
+        
       }else{
         dat <- setDT(dbGetQuery(sppDb,paste0("select trial_id, spp, seedlots,num_planted, qualitative_vigour, assessor_name_qual, qual_date
                                            from offsite_planting where trial_id = '", 
                                              input$trialSelect,"'")))
-        rhandsontable(dat,colHeaders = c("Trial_ID","Spp","Seedlots","Number Planted","Vigour", "Assessor","Assess Date")) %>%
+        #dat[,qualitative_vigour := factor(qualitative_vigour,levels = c("Excellent", "Good", "Fair", "Poor", "Fail", "UN"))]
+        rhandsontable(dat,colHeaders = c("Trial_ID","Spp","Seedlots","Number Planted","Vigour", "Assessor","Assess Date"),overflow = "visible") %>%
           hot_col("Vigour", type = "dropdown", 
-                  source = c("Excellent", "Good", "Fair", "Poor", "Fail", "UN"),strict = T)
+                  source = c("Excellent", "Good", "Fair", "Poor", "Fail", "UN"),strict = T) %>%
+          hot_col("Spp",type = "dropdown",
+                  source = sppData, strict = F)
       }
       
     }
@@ -296,33 +299,8 @@ observeEvent(input$submitAss,{
 
 observeEvent(input$offsiteMap_marker_click,{
   val <- input$offsiteMap_marker_click
-  #print(val)
-  #nme <- gsub("Name: ","",val)
   updateSelectInput(session,"trialSelect",selected = val$id)
 })
-
-
-# output$addTrial <- renderRHandsontable({
-#   input$submitTrial
-#   rhandsontable(trialInit) %>%
-#     hot_col("assessment", type = "dropdown", 
-#             source = c("Fail","Poor","Fair","Good","Excellent","UN"),strict = T)
-# })
-
-
-
-observeEvent(input$submitTrial,{
-  dat <- as.data.table(hot_to_r(input$addTrial))
-  dat[,`:=`(plotid = input$addTr_id,planted = input$addTr_planted,
-            project_id = input$addTr_proj, mod = input$trialMod,
-            lat = input$addTr_lat,long = input$addTr_long)]
-  dat <- st_as_sf(dat, coords = c("long","lat"), crs = 4326)
-  st_write(dat, sppDb, "offsite", append = TRUE)
-  shinyalert("Thank you!","Your trial has been recorded", type = "info", inputId = "trialMessage")
-  updateTextInput(session,"addTr_id",value = "")
-  updateDateInput(session,"addTr_planted",value = as.Date("2000-01-01"))
-  updateTextInput(session,"addTr_id",value = "")
-},priority = 5)
 
 observeEvent({c(input$trialType,
                 input$trialStart2,
