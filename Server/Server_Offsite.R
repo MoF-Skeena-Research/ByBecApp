@@ -251,14 +251,14 @@ observeEvent(input$trialaddSelect,{
                                              input$trialSelect,"'")))
         rhandsontable(dat) %>%
           hot_col("qualitative_vigour", type = "dropdown", 
-                  source = c("Fail","Poor","Fair","Good","Excellent","UN"),strict = T)
+                  source = c("Excellent", "Good", "Fair", "Poor", "Fail", "UN"),strict = T)
       }else{
         dat <- setDT(dbGetQuery(sppDb,paste0("select trial_id, spp, seedlots,num_planted, qualitative_vigour, assessor_name_qual, qual_date
                                            from offsite_planting where trial_id = '", 
                                              input$trialSelect,"'")))
-        rhandsontable(dat,colHeaders = c("Trial_ID","Spp","Seedlots","Number Planted","Ass Vigour", "Ass Name","Ass Date")) %>%
-          hot_col("Ass Vigour", type = "dropdown", 
-                  source = c("Fail","Poor","Fair","Good","Excellent","UN"),strict = T)
+        rhandsontable(dat,colHeaders = c("Trial_ID","Spp","Seedlots","Number Planted","Vigour", "Assessor","Assess Date")) %>%
+          hot_col("Vigour", type = "dropdown", 
+                  source = c("Excellent", "Good", "Fair", "Poor", "Fail", "UN"),strict = T)
       }
       
     }
