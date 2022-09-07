@@ -123,10 +123,16 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                              checkboxInput("completeOffsite","Show Entire Table?",value = F),
                              rHandsontableOutput("offsite_site"),
                              h3("Planting Info"),
+                             p("Either add a qualitative assessment, or right-click on the table to add a new row. Fill
+                               in relevant fields and click submit."),
                              rHandsontableOutput("offsite_planting"),
-                             actionButton("submitAss","Submit Assessment?"),
-                             actionButton("addoffsite","Add New Trial?")
-                             
+                             br(),
+                             actionButton("submitAss","Submit?"),
+                             actionButton("addoffsite","Add New Trial?"),
+                             hr(),
+                             br(),
+                             br()
+
                     ),
                     # h3("Existing Trial Information"),
                     # 

@@ -269,9 +269,19 @@ observeEvent(input$submitAss,{
   dat <- as.data.table(hot_to_r(input$offsite_planting))
   ##dat[,mod := input$assessMod]
   #print(dat)
-  
-  dbWriteTable(sppDb, "temp_ass_update", dat, overwrite = T)
-  dbExecute(sppDb,"UPDATE offsite_planting
+  datOrig <- setDT(dbGetQuery(sppDb,paste0("select trial_id as orig_id, spp, seedlots
+                                           from offsite_planting where trial_id = '", 
+                                           input$trialSelect,"'")))
+  if(nrow(dat) > nrow(datOrig)){##added new line
+    dat <- merge(dat, datOrig, by = c("spp","seedlots"),all = T)
+    dat <- dat[is.na(orig_id),]
+    dat[,orig_id := NULL]
+    dat[,trial_id := input$trialSelect]
+    dat <- rbind(plantingnames,dat, fill =  T)
+    dbAppendTable(sppDb,"offsite_planting",dat)
+  }else{
+    dbWriteTable(sppDb, "temp_ass_update", dat, overwrite = T)
+    dbExecute(sppDb,"UPDATE offsite_planting
                   SET qualitative_vigour = temp_ass_update.qualitative_vigour,
                   assessor_name_qual = temp_ass_update.assessor_name_qual,
                   qual_date = temp_ass_update.qual_date
@@ -279,6 +289,8 @@ observeEvent(input$submitAss,{
                   WHERE offsite_planting.trial_id = temp_ass_update.trial_id
                   AND offsite_planting.spp = temp_ass_update.spp
                   AND offsite_planting.seedlots = temp_ass_update.seedlots")
+  }
+
   shinyalert("Thank you!","Your updates have been recorded", type = "info", inputId = "assMessage")
 })
 
@@ -315,7 +327,9 @@ observeEvent(input$submitTrial,{
 observeEvent({c(input$trialType,
                 input$trialStart2,
                 input$sppPick2,
-                input$multiSppTrial)},{
+                input$multiSppTrial,
+                input$submitAss,
+                input$submitoffsite_site)},{
                   leafletProxy("offsiteMap") %>%
                     clearMarkers()
                   if(!is.null(input$trialType)){
