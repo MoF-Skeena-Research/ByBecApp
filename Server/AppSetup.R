@@ -113,6 +113,9 @@ for(i in 1:length(sppList2)){
   sppList2[[i]] <- sppList2[[i]][substr(sppList2[[i]],1,2) %in% substr(sppData,1,2)]
 }
 
+symbolGuide <- data.table(trial_type = c("Operational","Other","Research"),
+                          symbol = c("circle","diamond","plus"))
+
 minStart <- dbGetQuery(sppDb,"select min(plantingyear) from offsite_site")[1,1]
 maxStart <- dbGetQuery(sppDb,"select max(plantingyear) from offsite_site")[1,1]
 

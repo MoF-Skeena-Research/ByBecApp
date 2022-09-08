@@ -351,7 +351,7 @@ observeEvent({c(input$trialType,
                     if(nrow(dat2) == 0){
                       dat2 <- NULL
                       leafletProxy("offsiteMap") %>%
-                        removeGlPoints("tree_trial")
+                        clearMarkers()
                     }else{
                       #browser()
                       plotLocs <- unique(dat2["trial_id"])
@@ -369,24 +369,28 @@ observeEvent({c(input$trialType,
                       dat[,label := paste0("Name: ",trial_id)]
                       #dat <- dat[,.(trial_id,label,Col,trial_type)]
                       dat[,Col := as.character(Col)]
+                    
                       updateSelectInput(session,"trialSelect",choices = unique(dat$trial_id))
                       plotLocs <- st_as_sf(merge(plotLocs, dat, by = "trial_id"))
-                      print(names(plotLocs))
+                      temp <- as.data.table(st_coordinates(plotLocs))
+                      setnames(temp, c("long","lat"))
+                      plotLocs <- cbind(plotLocs, temp)
+                      vals <- unique(plotLocs$trial_type)
+                      print(vals)
+                      symbols <- symbolGuide[trial_type %in% vals,symbol]
                       # observeEvent(input$offsiteMap_zoom,{
                       #   print(input$offsiteMap_zoom)
                         leafletProxy("offsiteMap") %>%
-                          addCircleMarkers(data = plotLocs,
-                                           radius = ~ifelse(trial_type == "Research", 8, 6),
-                                           stroke = F,
-                                           fillOpacity = 0.9,
-                                           group = "tree_trial",
-                                           color = ~ Col,
-                                           layerId = ~ trial_id,
-                                           #popup = ~ label,
-                                           label = ~ label)
-                        # addGlPoints(data = plotLocs,layerId = "tree_trial",popup = ~ label,
-                        #             fillColor = ~ Col,fragmentShaderSource = "point")
-                      #})
+                          addSymbols(data = plotLocs,
+                                     lat = ~ lat,
+                                     lng = ~ long,
+                                     values = ~ trial_type,
+                                     shape = symbols,
+                                     fillOpacity = 0.9,
+                                     color = ~ Col,
+                                     width = 9,
+                                     layerId = ~ trial_id,
+                                     label = ~ label)
                       
                     }
                   }
