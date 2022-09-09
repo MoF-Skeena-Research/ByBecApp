@@ -72,12 +72,10 @@ observeEvent(input$offsiteMap_click,{
       h2("Trial ID"),
       textInput("newtrial_id", "Enter Trial ID"),
       h2("Site Info"),
-      rHandsontableOutput("blanksite"),
+      rHandsontableOutput("blanksite", height = 100),
       h2("Planting Info"),
-      rHandsontableOutput("blankplant"),
-      actionButton("submitoffsite_site","Submit to Database"),
-      size = "xl"
-    ))
+      rHandsontableOutput("blankplant", height = 100),
+      actionButton("submitoffsite_site","Submit to Database")    ))
     
   }
   

@@ -82,6 +82,10 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                              )
                     ),
                     tabPanel(value = "tab2", title = "Off-site Trials",
+                             tags$style(
+                               type = 'text/css',
+                               '.modal-dialog { width: fit-content !important; max-width: 75%;}'
+                             ),
                              fluidRow(
                                  column(4,
                                         h3("Select Tree Species"),
