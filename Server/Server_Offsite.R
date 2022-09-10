@@ -72,9 +72,9 @@ observeEvent(input$offsiteMap_click,{
       h2("Trial ID"),
       textInput("newtrial_id", "Enter Trial ID"),
       h2("Site Info"),
-      rHandsontableOutput("blanksite", height = 100),
+      rHandsontableOutput("blanksite"),
       h2("Planting Info"),
-      rHandsontableOutput("blankplant", height = 100),
+      rHandsontableOutput("blankplant"),
       actionButton("submitoffsite_site","Submit to Database")    ))
     
   }
@@ -192,7 +192,7 @@ observeEvent(input$trialaddSelect,{
     print(str(dat))
     datTemp <- data.table(Lat = globalLatLong$lat,Long = globalLatLong$long)
     dat <- cbind(datTemp, dat)
-    rhandsontable(dat,overflow = "visible") %>%
+    rhandsontable(dat,overflow = "hidden",height = 200) %>%
       hot_cols(format = "0.000000") %>%
       hot_col("trial_type",type = "dropdown",
               source = c("Research","Operational","Other"),
@@ -203,7 +203,7 @@ observeEvent(input$trialaddSelect,{
     dat <- setDT(dbGetQuery(sppDb,"select * from offsite_planting limit 0"))
     dat[,trial_id := NULL]
     print(str(dat))
-    rhandsontable(dat,overflow = "visible") %>%
+    rhandsontable(dat,overflow = "hidden",height = 200) %>%
       hot_table(minSpareRows = 1) %>%
       hot_col("sppvar", type = "dropdown",source = sppData, strict = F) %>%
       hot_col("spp", type = "dropdown",source = sppData, strict = F) %>%
@@ -214,17 +214,28 @@ observeEvent(input$trialaddSelect,{
 # observeEvent(input$addoffsite,{
 #   shinyalert("Select location or enter manually?",)
 # })
+  
+  observeEvent(input$completeOffsite,{
+    showModal(modalDialog(
+      h2("Site Info"),
+      rHandsontableOutput("offsite_site_full"),
+      h2("Planting Info"),
+      rHandsontableOutput("offsite_planting_full"),
+   ))
+  })
 
-
-  output$offsite_site <- renderRHandsontable({
+  output$offsite_site_full <- renderRHandsontable({
     if(input$trialSelect != ""){
-      if(input$completeOffsite){
         dat <- setDT(dbGetQuery(sppDb,paste0("select * 
                                            from offsite_site where trial_id = '",
                                              input$trialSelect,"'")))
         dat[,geometry := NULL]
-        rhandsontable(dat)
-      }else{
+        rhandsontable(dat, height = 200)
+      }
+  })
+
+  output$offsite_site <- renderRHandsontable({
+    if(input$trialSelect != ""){
         dat <- setDT(dbGetQuery(sppDb,paste0("select trial_id,project_name,trial_type,
                                            plantingyear,bgc,ss_nospace,elevation 
                                            from offsite_site where trial_id = '",
@@ -233,24 +244,25 @@ observeEvent(input$trialaddSelect,{
                                          "Site Series","Elevation"))
       }
       
+  })
+  
+  output$offsite_planting_full <- renderRHandsontable({
+    if(input$trialSelect != ""){
+      dat <- setDT(dbGetQuery(sppDb,paste0("select *
+                                           from offsite_planting where trial_id = '", 
+                                           input$trialSelect,"'")))
+      rhandsontable(dat, overflow = "hidden", height = 200) %>%
+        hot_col("qualitative_vigour", type = "dropdown", 
+                source = c("Excellent", "Good", "Fair", "Poor", "Fail", "UN"),strict = T) %>%
+        hot_col("spp",type = "dropdown",
+                source = sppData, strict = F) %>%
+        hot_col("sppvar",type = "dropdown",
+                source = sppData, strict = F)
     }
   })
 
   output$offsite_planting <- renderRHandsontable({
     if(input$trialSelect != ""){
-      if(input$completeOffsite){
-        dat <- setDT(dbGetQuery(sppDb,paste0("select *
-                                           from offsite_planting where trial_id = '", 
-                                             input$trialSelect,"'")))
-        rhandsontable(dat, overflow = "visible") %>%
-          hot_col("qualitative_vigour", type = "dropdown", 
-                  source = c("Excellent", "Good", "Fair", "Poor", "Fail", "UN"),strict = T) %>%
-          hot_col("spp",type = "dropdown",
-                  source = sppData, strict = F) %>%
-          hot_col("sppvar",type = "dropdown",
-                  source = sppData, strict = F)
-        
-      }else{
         dat <- setDT(dbGetQuery(sppDb,paste0("select trial_id, spp, seedlots,num_planted, qualitative_vigour, assessor_name_qual, qual_date
                                            from offsite_planting where trial_id = '", 
                                              input$trialSelect,"'")))
@@ -260,7 +272,6 @@ observeEvent(input$trialaddSelect,{
                   source = c("Excellent", "Good", "Fair", "Poor", "Fail", "UN"),strict = T) %>%
           hot_col("Spp",type = "dropdown",
                   source = sppData, strict = F)
-      }
       
     }
   })
