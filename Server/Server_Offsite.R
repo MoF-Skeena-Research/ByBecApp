@@ -193,7 +193,7 @@ observeEvent(input$trialaddSelect,{
     datTemp <- data.table(Lat = globalLatLong$lat,Long = globalLatLong$long)
     dat <- cbind(datTemp, dat)
     rhandsontable(dat,overflow = "hidden",height = 200) %>%
-      hot_cols(format = "0.000000") %>%
+      hot_cols(format = "0.00000") %>%
       hot_col("trial_type",type = "dropdown",
               source = c("Research","Operational","Other"),
               strict = T)
@@ -221,6 +221,7 @@ observeEvent(input$trialaddSelect,{
       rHandsontableOutput("offsite_site_full"),
       h2("Planting Info"),
       rHandsontableOutput("offsite_planting_full"),
+      actionButton("submitAss_full","Submit Updates")
    ))
   })
 
@@ -278,11 +279,46 @@ observeEvent(input$trialaddSelect,{
 
 
 observeEvent(input$submitAss,{
-  dat <- as.data.table(hot_to_r(input$offsite_planting))
+    dat <- as.data.table(hot_to_r(input$offsite_planting))
+    ##dat[,mod := input$assessMod]
+    #print(dat)
+    datOrig <- setDT(dbGetQuery(sppDb,paste0("select trial_id as orig_id, spp, seedlots
+                                           from offsite_planting where trial_id = '", 
+                                             input$trialSelect,"'")))
+    if(nrow(dat) > nrow(datOrig)){##added new line
+      dat <- merge(dat, datOrig, by = c("spp","seedlots"),all = T)
+      dat <- dat[is.na(orig_id),]
+      dat[,orig_id := NULL]
+      dat[,trial_id := input$trialSelect]
+      dat <- rbind(plantingnames,dat, fill =  T)
+      dbAppendTable(sppDb,"offsite_planting",dat)
+    }else{
+      dbWriteTable(sppDb, "temp_ass_update", dat, overwrite = T)
+      dbExecute(sppDb,"UPDATE offsite_planting
+                  SET qualitative_vigour = temp_ass_update.qualitative_vigour,
+                  assessor_name_qual = temp_ass_update.assessor_name_qual,
+                  qual_date = temp_ass_update.qual_date
+                  FROM temp_ass_update
+                  WHERE offsite_planting.trial_id = temp_ass_update.trial_id
+                  AND offsite_planting.spp = temp_ass_update.spp
+                  AND offsite_planting.seedlots = temp_ass_update.seedlots")
+    }
+    
+    shinyalert("Thank you!","Your updates have been recorded", type = "info", inputId = "assMessage")
+  
+})
+
+observeEvent(input$submitAss_full,{
+  req(input$submitAss_full)
+  dat2 <- hot_to_r(input$offsite_planting_full)
+  if(!is.null(dat2)) {
+    dat <- as.data.table(dat2)
+    removeModal()
+  }
   ##dat[,mod := input$assessMod]
   #print(dat)
   datOrig <- setDT(dbGetQuery(sppDb,paste0("select trial_id as orig_id, spp, seedlots
-                                           from offsite_planting where trial_id = '", 
+                                           from offsite_planting where trial_id = '",
                                            input$trialSelect,"'")))
   if(nrow(dat) > nrow(datOrig)){##added new line
     dat <- merge(dat, datOrig, by = c("spp","seedlots"),all = T)
@@ -304,6 +340,7 @@ observeEvent(input$submitAss,{
   }
 
   shinyalert("Thank you!","Your updates have been recorded", type = "info", inputId = "assMessage")
+
 })
 
 observeEvent(input$offsiteMap_marker_click,{
@@ -316,6 +353,7 @@ observeEvent({c(input$trialType,
                 input$sppPick2,
                 input$multiSppTrial,
                 input$submitAss,
+                input$submitAss_full,
                 input$submitoffsite_site)},{
                   leafletProxy("offsiteMap") %>%
                     clearMarkers()

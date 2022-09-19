@@ -12,15 +12,25 @@ dbSafeNames = function(names) {
   names
 }
 
+library(RODBC)
+con2 <- odbcConnect("OffsiteAccess")
+tbls <- sqlTables(con2)
+tbls$TABLE_NAME
+site <- sqlQuery(con2, "select * from Trial_Site_Info")
+site <- as.data.table(site)
+odbcCloseAll()
+
 ##offsite trial tables
  dbExecute(con, "drop table offsite_site")
 # dbExecute(con, "drop table offsite_planting")
 
-site <- fread("Trial_Site_Info.csv")
+#site <- fread("Trial_Site_Info.csv")
 planting <-  fread("Trial_Planting_Info.csv")
 setnames(site, dbSafeNames(colnames(site)))
 setnames(planting, dbSafeNames(colnames(planting)))
-site[,snr := as.character(snr)]
+#site <- site[,lapply(.SD, as.character), .SDcols = c("snr","sitesoilfactor1","sitesoilfactor2","sitesoilfactor3","siteprep")]
+site[,c("snr","sitesoilfactor1","sitesoilfactor2","sitesoilfactor3","siteprep") := lapply(.SD, as.character), .SDcols = c("snr","sitesoilfactor1","sitesoilfactor2","sitesoilfactor3","siteprep")]
+site[,plantingdate := as.Date(plantingdate)]
 #planting[,sppvar := tolower(sppvar)]
 capwords <- function(s, strict = FALSE) {
   cap <- function(s) paste(toupper(substring(s, 1, 1)),
