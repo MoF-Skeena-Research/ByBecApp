@@ -12,6 +12,7 @@ library(RPostgres)
 library(shinyjs)
 library(leafgl)
 library(leaflet)
+library(leaflet.extras)
 library(leaflegend)
 library(colourvalues)
 library(shinythemes)
@@ -68,7 +69,7 @@ idDat[,edatopic := paste0(SNR,SMR)]
 edaFreqCols <- data.table(FeasVal = rev(seq(4,1,by = -0.5)), 
                           Col = rev(c('#40004b','#40004b','#762a83','#9970ab','#5aae61','#1b7837','#00441b')))
 assCols <- data.table(ID = c(1,2,3,4,5,0), 
-                      Col = c("#C30000","#E79B1A","#E6F000","#00C61A","#B00E9F","#6F6F6F"))
+                      Col = c("#C30000","#E79B1A","#E6F000","#B4FB29","#008D1A","#6F6F6F"))
 assID <- data.table(assessment = c("Fail","Poor","Fair","Good","Excellent","UN"),
                     ID = c(1,2,3,4,5,0))
 fhCols <- data.frame(hazard = c("High","Moderate","Low"), 

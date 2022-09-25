@@ -34,11 +34,76 @@ observeEvent(input$tabs,{
           group = "Cities",
           options = leaflet::pathOptions(pane = "overlayPane")) %>%
         addBGCTiles() %>%
+        addDrawToolbar(
+          targetGroup='draw',
+          editOptions = editToolbarOptions(selectedPathOptions = selectedPathOptions())) %>%
         leaflet::addLayersControl(
           baseGroups = c("Hillshade","Positron","Satellite", "OpenStreetMap"),
           overlayGroups = c("BGCs","Districts","Cities"),
           position = "topright")
     })
+    
+    getoffsiteData_all <- reactive({
+      dat <- st_read(sppDb, query = "select * from offsite_site
+                                      inner join offsite_planting USING (trial_id)")
+      coords <- as.data.table(st_coordinates(dat))
+      dat <- as.data.table(st_drop_geometry(dat))
+      setnames(coords, c("Lat","Long"))
+      dat2 <- cbind(coords,dat)
+      dat2[,`geometry..24` := NULL]
+      #browser()
+      return(dat2)
+    })
+    
+    getoffsiteData <- reactive({
+      if(!is.null(input$offsiteMap_draw_new_feature)){
+        feature <- input$offsiteMap_draw_new_feature
+        temp <- feature$geometry$coordinates[[1]]
+        coordMat <- matrix(unlist(temp),ncol = 2,byrow = T)
+        feat <- st_as_sf(as.data.frame(coordMat),coords = c(1,2),crs = 4326)
+        feat <- st_cast(st_combine(feat),"POLYGON")
+        
+        sql <- paste0(
+          "with poly as (
+        SELECT ST_PolygonFromText('", st_as_text(feat), "',4326) geometry
+        )
+  
+        select * from offsite_site
+        join poly
+        on ST_Within(offsite_site.geometry,poly.geometry)
+        inner join offsite_planting USING (trial_id)
+        "
+        )
+        dat <- st_read(sppDb,query = sql)
+        #browser()
+        coords <- as.data.table(st_coordinates(dat))
+        dat <- as.data.table(st_drop_geometry(dat))
+        setnames(coords, c("Lat","Long"))
+        dat2 <- cbind(coords,dat)
+        dat2[,`geometry..24` := NULL]
+        #browser()
+        return(dat2)
+      }else{
+        shinyalert("No data selected!!")
+      }
+      
+    })
+    
+    output$download_offsite <- downloadHandler(
+      filename = "Offsite_Data_Select.csv",
+      content = function(file){
+        fwrite(getoffsiteData(),file)
+      }
+    )
+      
+    output$download_offsite_all <- downloadHandler(
+      filename = "Offsite_Data_All.csv",
+      content = function(file){
+        fwrite(getoffsiteData_all(),file)
+      }
+    ) 
+
+
     
     # observeEvent(input$trialSelect,{
     #   output$assIn <- renderRHandsontable({
