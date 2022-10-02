@@ -154,26 +154,33 @@ observeEvent({c(input$showtrees,
                       removeGlPoints("tree_plot")
                   }
                   if(!is.null(input$trials)){
-                    dat2 <- st_read(sppDb,query = paste0("select project_id, plotid, spp, seedlot,assessment, geometry from offsite where spp like '",
-                                                       sppName,"%' and project_id in ('",paste(input$trials,collapse = "','"),
-                                                       "') and planted > '", input$trialStart[1],"' and planted < '",input$trialStart[2],"'"))
+                    #browser()
+                    dat2 <- st_read(sppDb, query = paste0("select offsite_planting.trial_id, spp, trial_type, qualitative_vigour, geometry 
+                                                             from offsite_planting 
+                                                             join offsite_site using (trial_id) 
+                                                             where trial_type in ('",paste(input$trials,collapse = "','"),
+                                                          "') and spp in ('", sppName,
+                                                          "') and plantingyear > '", input$trialStart[1],"' and plantingyear < '",input$trialStart[2],"'"))
+
                     if(nrow(dat2) == 0){
                       dat2 <- NULL
                       leafletProxy("map") %>%
                         removeGlPoints("tree_trial")
                     }else{
+                      plotLocs <- unique(dat2["trial_id"])
                       dat <- as.data.table(st_drop_geometry(dat2))
-                      dat[assID, ID := i.ID, on = "assessment"]
-                      dat <- dat[,.(ID = max(ID)), by = .(plotid,spp)]
+                      dat[,qualitative_vigour := as.character(qualitative_vigour)]
+                      dat[is.na(qualitative_vigour), qualitative_vigour := "UN"]
+                      dat[assID, ID := i.ID, on = c(qualitative_vigour = "assessment")]
+                      dat <- dat[,.(ID = max(ID)), by = .(trial_id,spp,trial_type)]
                       dat[assCols, Col := i.Col, on = "ID"]
-                      dat[,label := paste0("Name: ",plotid)]
-                      dat <- dat[,.(plotid,label,Col)]
+                
                       dat[,Col := as.character(Col)]
-                      plotLocs <- merge(dat2, dat, by = "plotid")
+                      plotLocs <- merge(plotLocs, dat, by = "trial_id")
                       
                       leafletProxy("map") %>%
-                        addGlPoints(data = plotLocs,layerId = "tree_trial",popup = ~ label,
-                                    fillColor = plotLocs$Col,fragmentShaderSource = "square")
+                        addGlPoints(data = plotLocs,layerId = "tree_trial",
+                                    fillColor = plotLocs$Col,fillOpacity = 1)
                     }
                   }else{
                     leafletProxy("map") %>%

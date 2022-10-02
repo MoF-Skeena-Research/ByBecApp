@@ -9,7 +9,7 @@ observeEvent(input$showinstr_offsite,{
 
 observeEvent(input$tabs,{
   if(input$tabs == "tab2"){
-    proj_names <- dbGetQuery(sppDb, "select distinct trial_type from offsite_site")[,1]
+    #proj_names <- dbGetQuery(sppDb, "select distinct trial_type from offsite_site")[,1]
     updatePickerInput(session, "trialType", choices = proj_names, selected = proj_names)
     
     updatePickerInput(session, "sppPick2", choices = sppList2,selected = sppList2[[1]][5])
@@ -44,13 +44,17 @@ observeEvent(input$tabs,{
     })
     
     getoffsiteData_all <- reactive({
-      dat <- st_read(sppDb, query = "select * from offsite_site
-                                      inner join offsite_planting USING (trial_id)")
+      ##browser()
+      dat <- st_read(sppDb, query = paste0("select * from offsite_site
+                                      inner join offsite_planting USING (trial_id)
+                                      where trial_type in ('",paste(input$trialType,collapse = "','"),
+                     "') and plantingyear > '", input$trialStart2[1],"' and plantingyear < '",input$trialStart2[2],
+                     "' and spp in ('", paste(substr(input$sppPick2,1,2),collapse = "','"),
+                     "')"))
       coords <- as.data.table(st_coordinates(dat))
       dat <- as.data.table(st_drop_geometry(dat))
       setnames(coords, c("Lat","Long"))
       dat2 <- cbind(coords,dat)
-      dat2[,`geometry..24` := NULL]
       #browser()
       return(dat2)
     })
@@ -281,6 +285,28 @@ observeEvent(input$trialaddSelect,{
 # })
   
   observeEvent(input$completeOffsite,{
+    #browser()
+    output$offsite_planting_full <- renderRHandsontable({
+      dat <- setDT(dbGetQuery(sppDb,paste0("select *
+                                           from offsite_planting where trial_id = '", 
+                                           globalTrialID$ID,"'")))
+      rhandsontable(dat, overflow = "hidden", height = 200) %>%
+        hot_col("qualitative_vigour", type = "dropdown", 
+                source = c("Excellent", "Good", "Fair", "Poor", "Fail", "UN"),strict = T) %>%
+        hot_col("spp",type = "dropdown",
+                source = sppData, strict = F) %>%
+        hot_col("sppvar",type = "dropdown",
+                source = sppData, strict = F)
+    })
+    
+    output$offsite_site_full <- renderRHandsontable({
+      dat <- setDT(dbGetQuery(sppDb,paste0("select * 
+                                           from offsite_site where trial_id = '",
+                                           globalTrialID$ID,"'")))
+      dat[,geometry := NULL]
+      rhandsontable(dat, height = 200)
+    })
+    
     showModal(modalDialog(
       h2("Site Info"),
       rHandsontableOutput("offsite_site_full"),
@@ -290,48 +316,27 @@ observeEvent(input$trialaddSelect,{
    ))
   })
 
-  output$offsite_site_full <- renderRHandsontable({
-    if(input$trialSelect != ""){
-        dat <- setDT(dbGetQuery(sppDb,paste0("select * 
-                                           from offsite_site where trial_id = '",
-                                             input$trialSelect,"'")))
-        dat[,geometry := NULL]
-        rhandsontable(dat, height = 200)
-      }
-  })
+  
 
   output$offsite_site <- renderRHandsontable({
-    if(input$trialSelect != ""){
+    if(!is.null(globalTrialID$ID)){
         dat <- setDT(dbGetQuery(sppDb,paste0("select trial_id,project_name,trial_type,
                                            plantingyear,bgc,ss_nospace,elevation 
                                            from offsite_site where trial_id = '",
-                                             input$trialSelect,"'")))
+                                             globalTrialID$ID,"'")))
         rhandsontable(dat,colHeaders = c("Trial_ID","Project","Trial","Planting Year","BGC",
                                          "Site Series","Elevation"))
       }
       
   })
   
-  output$offsite_planting_full <- renderRHandsontable({
-    if(input$trialSelect != ""){
-      dat <- setDT(dbGetQuery(sppDb,paste0("select *
-                                           from offsite_planting where trial_id = '", 
-                                           input$trialSelect,"'")))
-      rhandsontable(dat, overflow = "hidden", height = 200) %>%
-        hot_col("qualitative_vigour", type = "dropdown", 
-                source = c("Excellent", "Good", "Fair", "Poor", "Fail", "UN"),strict = T) %>%
-        hot_col("spp",type = "dropdown",
-                source = sppData, strict = F) %>%
-        hot_col("sppvar",type = "dropdown",
-                source = sppData, strict = F)
-    }
-  })
+  
 
   output$offsite_planting <- renderRHandsontable({
-    if(input$trialSelect != ""){
+    if(!is.null(globalTrialID$ID)){
         dat <- setDT(dbGetQuery(sppDb,paste0("select trial_id, spp, seedlots,num_planted, qualitative_vigour, assessor_name_qual, qual_date
                                            from offsite_planting where trial_id = '", 
-                                             input$trialSelect,"'")))
+                                             globalTrialID$ID,"'")))
         #dat[,qualitative_vigour := factor(qualitative_vigour,levels = c("Excellent", "Good", "Fair", "Poor", "Fail", "UN"))]
         rhandsontable(dat,colHeaders = c("Trial_ID","Spp","Seedlots","Number Planted","Vigour", "Assessor","Assess Date"),overflow = "visible") %>%
           hot_col("Vigour", type = "dropdown", 
@@ -349,12 +354,12 @@ observeEvent(input$submitAss,{
     #print(dat)
     datOrig <- setDT(dbGetQuery(sppDb,paste0("select trial_id as orig_id, spp, seedlots
                                            from offsite_planting where trial_id = '", 
-                                             input$trialSelect,"'")))
+                                             globalTrialID$ID,"'")))
     if(nrow(dat) > nrow(datOrig)){##added new line
       dat <- merge(dat, datOrig, by = c("spp","seedlots"),all = T)
       dat <- dat[is.na(orig_id),]
       dat[,orig_id := NULL]
-      dat[,trial_id := input$trialSelect]
+      dat[,trial_id := globalTrialID$ID]
       dat <- rbind(plantingnames,dat, fill =  T)
       dbAppendTable(sppDb,"offsite_planting",dat)
     }else{
@@ -384,12 +389,12 @@ observeEvent(input$submitAss_full,{
   #print(dat)
   datOrig <- setDT(dbGetQuery(sppDb,paste0("select trial_id as orig_id, spp, seedlots
                                            from offsite_planting where trial_id = '",
-                                           input$trialSelect,"'")))
+                                           globalTrialID$ID,"'")))
   if(nrow(dat) > nrow(datOrig)){##added new line
     dat <- merge(dat, datOrig, by = c("spp","seedlots"),all = T)
     dat <- dat[is.na(orig_id),]
     dat[,orig_id := NULL]
-    dat[,trial_id := input$trialSelect]
+    dat[,trial_id := globalTrialID$ID]
     dat <- rbind(plantingnames,dat, fill =  T)
     dbAppendTable(sppDb,"offsite_planting",dat)
   }else{
@@ -410,7 +415,7 @@ observeEvent(input$submitAss_full,{
 
 observeEvent(input$offsiteMap_marker_click,{
   val <- input$offsiteMap_marker_click
-  updateSelectInput(session,"trialSelect",selected = val$id)
+  globalTrialID$ID = val$id
 })
 
 observeEvent({c(input$trialType,
@@ -418,7 +423,7 @@ observeEvent({c(input$trialType,
                 input$sppPick2,
                 input$multiSppTrial,
                 input$submitAss,
-                input$submitAss_full,
+                #input$submitAss_full,
                 input$submitoffsite_site)},{
                   leafletProxy("offsiteMap") %>%
                     clearMarkers()
@@ -482,7 +487,7 @@ observeEvent({c(input$trialType,
                       #dat <- dat[,.(trial_id,label,Col,trial_type)]
                       dat[,Col := as.character(Col)]
                     
-                      updateSelectInput(session,"trialSelect",choices = unique(dat$trial_id))
+                      #updateSelectInput(session,"trialSelect",choices = unique(dat$trial_id))
                       plotLocs <- st_as_sf(merge(plotLocs, dat, by = "trial_id"))
                       temp <- as.data.table(st_coordinates(plotLocs))
                       setnames(temp, c("long","lat"))

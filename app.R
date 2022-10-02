@@ -48,7 +48,7 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                               girafeOutput("edaplot",height = "350px"),
                                               
                                               checkboxGroupInput("showtrees","Show species plots",choices = c("BC","AB","US"),inline = T),
-                                              checkboxGroupInput("trials","Show location of offsite trials",c("AMAT","RESULTS"), inline = T),
+                                              selectInput("trials","Select Offsite Trials",choices = proj_names, multiple = T),
                                               sliderInput("trialStart","Filter offsite trials by planting date:",
                                                           min = minStart, max = maxStart, value = c(minStart,maxStart)),
                                               downloadButton("downloadFeasMap",label = "Export Spatial")
@@ -113,12 +113,12 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                         br(),
                                         hr(),
                                         h4("Select Trial on Map or "), actionButton("addoffsite","Add New Trial"),
-                                        selectInput("trialSelect",
-                                                    label = "Select a trial, or click on map",
-                                                    choices = NULL),
+                                        # selectInput("trialSelect",
+                                        #             label = "Select a trial, or click on map",
+                                        #             choices = NULL),
                                         h3("Trial Info"),
-                                        downloadButton("download_offsite","Download Select Data"),
-                                        downloadButton("download_offsite_all","Download All Data"),
+                                        downloadButton("download_offsite","Download Selected Trials"),
+                                        downloadButton("download_offsite_all","Download Filtered Trials"),
                                         actionButton("completeOffsite","Show Entire Table"),
                                         rHandsontableOutput("offsite_site"),
                                         h3("Planting Info"),
@@ -389,6 +389,7 @@ server <- function(input, output, session) {
     globalSelBEC <- reactiveVal()
     globalAddTrial <- reactiveValues(data = trialInit)
     globalLatLong <- reactiveValues(lat = NA_real_, long = NA_real_, useMap = F)
+    globalTrialID <- reactiveValues(ID = NULL)
     climsumInputs <- reactiveValues()
     climsumCols <- reactiveValues(Data = data.table())
     climsumExtreme <- reactiveValues()

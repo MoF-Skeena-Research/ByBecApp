@@ -69,11 +69,13 @@ idDat[,edatopic := paste0(SNR,SMR)]
 edaFreqCols <- data.table(FeasVal = rev(seq(4,1,by = -0.5)), 
                           Col = rev(c('#40004b','#40004b','#762a83','#9970ab','#5aae61','#1b7837','#00441b')))
 assCols <- data.table(ID = c(1,2,3,4,5,0), 
-                      Col = c("#C30000","#E79B1A","#E6F000","#B4FB29","#008D1A","#6F6F6F"))
+                      Col = c("#C30000","#E79B1A","#E6F000","#B4FB29","#008D1A","#8F8F8F"))
 assID <- data.table(assessment = c("Fail","Poor","Fair","Good","Excellent","UN"),
                     ID = c(1,2,3,4,5,0))
 fhCols <- data.frame(hazard = c("High","Moderate","Low"), 
                      Col = c("#D80000","#FFEF01","#0CC200"))
+
+proj_names <- dbGetQuery(sppDb, "select distinct trial_type from offsite_site")[,1]
 
 #grRamp2 <- colorRamp(c("#443e3dFF","#c0c0c0ff"),alpha = T) ##colour ramp for gray values
 taxaCols <- c("#443e3d","#876114","#3d7075","#443e3d","#443e3d")
