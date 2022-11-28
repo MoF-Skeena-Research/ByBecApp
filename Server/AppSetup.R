@@ -21,26 +21,26 @@ library(pool)
 
 ##connect to database
 ###Read in climate summary data
-mbtk="pk.eyJ1Ijoid2htYWNrZW4iLCJhIjoiY2twaDVkNXU5MmJieTJybGE3cWRtY3Q4aCJ9.ISBkzSHFfrr78AVP2y2FeQ"
-mblbsty = "whmacken/ckph5q6d21q1318nz4shnyp20"
-mbsty="whmacken/ckph5e7y01fhr17qk5nhnpo10"
+mbtk=Sys.getenv("BCGOV_MAPBOX_TOKEN")
+mblbsty = Sys.getenv("BCGOV_MAPBOX_LABELS_STYLE")
+mbsty=Sys.getenv("BCGOV_MAPBOX_HILLSHADE_STYLE")
 
 sppDb <- dbPool(
   drv = RPostgres::Postgres(),
   dbname = "spp_feas",
-  host = "138.197.168.220",
+  host = Sys.getenv("BCGOV_HOST"),
   port = 5432, 
-  user = "postgres",
-  password = "PowerOfBEC"
+  user = Sys.getenv("BCGOV_USR"),
+  password = Sys.getenv("BCGOV_PWD")
 )
 
 climDb <- dbPool(
   drv = RPostgres::Postgres(),
   dbname = "bgc_climate_data",
-  host = "138.197.168.220",
+  host = Sys.getenv("BCGOV_HOST"),
   port = 5432, 
-  user = "postgres",
-  password = "PowerOfBEC"
+  user = Sys.getenv("BCGOV_USR"),
+  password = Sys.getenv("BCGOV_PWD")
 )
 
 
