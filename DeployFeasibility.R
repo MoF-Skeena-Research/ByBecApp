@@ -5,6 +5,7 @@ temp <- analogsea::droplets()
 server <- temp$`shiny-server`
 analogsea::droplet_ssh(server,"rm -R /srv/shiny-server/bybecmap")
 analogsea::droplet_ssh(server, "mkdir /srv/shiny-server/bybecmap")
+analogsea::droplet_upload(server, "./.Renviron", "/srv/shiny-server/bybecmap/.Renviron")
 analogsea::droplet_upload(server, "./app.R", "/srv/shiny-server/bybecmap/app.R")
 analogsea::droplet_upload(server, "./Server", "/srv/shiny-server/bybecmap")
 analogsea::droplet_upload(server, "./www", "/srv/shiny-server/bybecmap")

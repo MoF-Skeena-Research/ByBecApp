@@ -3,7 +3,7 @@ library(data.table)
 library(sf)
 
 drv <- dbDriver("PostgreSQL")
-con <- dbConnect(drv, user = "postgres", password = "PowerOfBEC", host = "138.197.168.220", 
+con <- dbConnect(drv, user = "postgres", password = Sys.getenv("BCGOV_PWD"), host = "178.128.233.227", 
                  port = 5432, dbname = "spp_feas")
 dbSafeNames = function(names) {
   names = gsub('[^a-z0-9]+','_',tolower(names))
@@ -20,6 +20,16 @@ site <- sqlQuery(con2, "select * from Trial_Site_Info")
 site <- as.data.table(site)
 odbcCloseAll()
 
+dbGetQuery(con,"SELECT ST_SRID(geom) FROM bgc_simple LIMIT 1")
+test <- dbGetQuery(con,"select count(*) from bgc_simple")
+datWNA <- st_read("WNA_BGC_v12_5Apr2022_new_simplified.gpkg")
+datWNA2 <- aggregate(datWNA, by = list(datWNA$BGC), FUN = mean, do_union = F)
+datWNA2$BGC <- NULL
+colnames(datWNA2) <- c("bgc","geom")
+st_geometry(datWNA2) <- "geom"
+st_crs(datWNA2)
+dbExecute(con,"create index on wna_simple(bgc)")
+st_write(datWNA2,con,"wna_simple",row.names = F)
 ##offsite trial tables
  dbExecute(con, "drop table offsite_site")
 # dbExecute(con, "drop table offsite_planting")

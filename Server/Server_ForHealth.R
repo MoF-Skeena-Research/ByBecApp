@@ -77,7 +77,8 @@ observeEvent(input$fhSpp,{
 output$downloadFHMap <- downloadHandler(
   filename = paste0("TheBECZone_ForestHealth_",substr(input$fhSpp,1,2),"_",input$pest,".gpkg"),
   content = function(file){
-    Q1 <- paste0("SELECT bgc_simple.bgc, temp.hazard_update as hazard, temp.treecode, temp.pest, bgc_simple.geom
+    if(input$fh_region == "BC"){
+      Q1 <- paste0("SELECT bgc_simple.bgc, temp.hazard_update as hazard, temp.treecode, temp.pest, bgc_simple.geom
                     FROM bgc_simple
                     JOIN (SELECT bgc, hazard_update, treecode, pest
                           FROM forhealth
@@ -86,7 +87,18 @@ output$downloadFHMap <- downloadHandler(
                           AND hazard_update <> 'UN' 
                           AND region = 'BC') temp
                     ON (bgc_simple.bgc = temp.bgc)")
-    print(Q1)
+    }else{
+      Q1 <- paste0("SELECT wna_simple.bgc, temp.hazard_update as hazard, temp.treecode, temp.pest, wna_simple.geom
+                    FROM wna_simple
+                    JOIN (SELECT bgc, hazard_update, treecode, pest
+                          FROM forhealth
+                          WHERE treecode like '",substr(input$fhSpp,1,2),"'
+                          AND pest = '",input$pestSpp,"' 
+                          AND hazard_update <> 'UN') temp
+                    ON (wna_simple.bgc = temp.bgc)")
+    }
+    
+    #print(Q1)
     dat <- st_read(sppDb,query = Q1)
     st_write(dat,file)
   }
