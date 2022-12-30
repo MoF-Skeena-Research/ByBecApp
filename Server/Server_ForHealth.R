@@ -84,7 +84,6 @@ output$downloadFHMap <- downloadHandler(
                           FROM forhealth
                           WHERE treecode like '",substr(input$fhSpp,1,2),"'
                           AND pest = '",input$pestSpp,"' 
-                          AND hazard_update <> 'UN' 
                           AND region = 'BC') temp
                     ON (bgc_simple.bgc = temp.bgc)")
     }else{
@@ -93,8 +92,7 @@ output$downloadFHMap <- downloadHandler(
                     JOIN (SELECT bgc, hazard_update, treecode, pest
                           FROM forhealth
                           WHERE treecode like '",substr(input$fhSpp,1,2),"'
-                          AND pest = '",input$pestSpp,"' 
-                          AND hazard_update <> 'UN') temp
+                          AND pest = '",input$pestSpp,"') temp
                     ON (wna_simple.bgc = temp.bgc)")
     }
     
