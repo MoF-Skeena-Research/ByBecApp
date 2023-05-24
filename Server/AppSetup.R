@@ -43,10 +43,20 @@ climDb <- dbPool(
   password = Sys.getenv("BCGOV_PWD")
 )
 
+gomDb <- dbPool(
+  drv = RPostgres::Postgres(),
+  dbname = Sys.getenv("GOM_DB"),
+  host = Sys.getenv("GOM_HOST"),
+  port = Sys.getenv("GOM_PORT"), 
+  user = "postgres",
+  password = Sys.getenv("GOM_PWD")
+)
+
 
 onStop(function() {
   poolClose(climDb)
   poolClose(sppDb)
+  poolClose(gomDb)
 })
 
 subzones_colours_ref <- fread("./inputs/WNA_v12_HexCols.csv")
@@ -69,7 +79,7 @@ idDat[,edatopic := paste0(SNR,SMR)]
 edaFreqCols <- data.table(FeasVal = rev(seq(4,1,by = -0.5)), 
                           Col = rev(c('#40004b','#40004b','#762a83','#9970ab','#5aae61','#1b7837','#00441b')))
 assCols <- data.table(ID = c(1,2,3,4,5,0), 
-                      Col = c("#C30000","#E79B1A","#E6F000","#B4FB29","#008D1A","#8F8F8F"))
+                      Col = c("#C30000","#E79B1A","#E6F000","#B4FB29","#008D1A","#4f4f4f"))
 assID <- data.table(assessment = c("Fail","Poor","Fair","Good","Excellent","UN"),
                     ID = c(1,2,3,4,5,0))
 fhCols <- data.frame(hazard = c("High","Moderate","Low"), 
@@ -111,16 +121,19 @@ allSppNames <- unname(allSppNames)
 
 ##offsite
 sppData <- dbGetQuery(sppDb, "select distinct spp from offsite_planting")[,1]
+gomData <- dbGetQuery(gomDb, "select distinct species from planting_info")[,1]
+sppData <- c(sppData,gomData)
 sppList2 <- sppList
 for(i in 1:length(sppList2)){
   sppList2[[i]] <- sppList2[[i]][substr(sppList2[[i]],1,2) %in% substr(sppData,1,2)]
 }
 
-symbolGuide <- data.table(trial_type = c("Operational","Other","Research"),
-                          symbol = c("circle","diamond","plus"))
+symbolGuide <- data.table(trial_type = c("GOM", "Operational","Other","Research"),
+                          symbol = c("triangle","circle","diamond","plus"))
 
 minStart <- dbGetQuery(sppDb,"select min(plantingyear) from offsite_site")[1,1]
-maxStart <- dbGetQuery(sppDb,"select max(plantingyear) from offsite_site")[1,1]
+#maxStart <- dbGetQuery(sppDb,"select max(plantingyear) from offsite_site")[1,1]
+maxStart <- 2023
 
 offsiteNames <- dbGetQuery(sppDb,"select distinct plotid from offsite")[,1]
 offsiteProj <- dbGetQuery(sppDb,"select distinct project_id from offsite")[,1]

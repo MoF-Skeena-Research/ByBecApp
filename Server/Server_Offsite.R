@@ -10,8 +10,7 @@ observeEvent(input$showinstr_offsite,{
 observeEvent(input$tabs,{
   if(input$tabs == "tab2"){
     #proj_names <- dbGetQuery(sppDb, "select distinct trial_type from offsite_site")[,1]
-    updatePickerInput(session, "trialType", choices = proj_names, selected = proj_names)
-    
+    updatePickerInput(session, "trialType", choices = c(proj_names,"GOM"), selected = "GOM")
     updatePickerInput(session, "sppPick2", choices = sppList2,selected = sppList2[[1]][5])
     
     output$offsiteMap <- renderLeaflet({
@@ -120,6 +119,13 @@ observeEvent(input$tabs,{
     #     }
     #   })
     # })
+  }
+})
+
+observeEvent(input$goToLocation,{
+  if(!is.null(input$lat) & !is.null(input$long)){
+    leafletProxy("offsiteMap") %>%
+      flyTo(lat = input$lat, lng = input$long, zoom = 12)
   }
 })
 
@@ -320,12 +326,23 @@ observeEvent(input$trialaddSelect,{
 
   output$offsite_site <- renderRHandsontable({
     if(!is.null(globalTrialID$ID)){
+      if(("GOM" %in% input$trialType) & nchar(globalTrialID$ID) > 30){
+        dat <- setDT(dbGetQuery(gomDb,paste0("select plantation_id,date_established,
+                                           site_series,elevation 
+                                           from planting_info where trial_id = '",
+                                             globalTrialID$ID,"'"))) %>% unique()
+        rhandsontable(dat,colHeaders = c("Plantation_ID","Established","BGC",
+                                         "Elevation"))
+      }else{
         dat <- setDT(dbGetQuery(sppDb,paste0("select trial_id,project_name,trial_type,
                                            plantingyear,bgc,ss_nospace,elevation 
                                            from offsite_site where trial_id = '",
                                              globalTrialID$ID,"'")))
         rhandsontable(dat,colHeaders = c("Trial_ID","Project","Trial","Planting Year","BGC",
                                          "Site Series","Elevation"))
+      }
+        
+        
       }
       
   })
@@ -334,6 +351,12 @@ observeEvent(input$trialaddSelect,{
 
   output$offsite_planting <- renderRHandsontable({
     if(!is.null(globalTrialID$ID)){
+      if(("GOM" %in% input$trialType) & nchar(globalTrialID$ID) > 30){
+        dat <- setDT(dbGetQuery(gomDb,paste0("select plantation_id, species, seedlot,trees_number
+                                           from planting_info where trial_id = '", 
+                                             globalTrialID$ID,"'")))
+        rhandsontable(dat,colHeaders = c("Plantation_ID","Spp","Seedlots","Number Planted"),overflow = "visible")
+      }else{
         dat <- setDT(dbGetQuery(sppDb,paste0("select trial_id, spp, seedlots,num_planted, qualitative_vigour, assessor_name_qual, qual_date
                                            from offsite_planting where trial_id = '", 
                                              globalTrialID$ID,"'")))
@@ -343,6 +366,8 @@ observeEvent(input$trialaddSelect,{
                   source = c("Excellent", "Good", "Fair", "Poor", "Fail", "UN"),strict = T) %>%
           hot_col("Spp",type = "dropdown",
                   source = sppData, strict = F)
+      }
+        
       
     }
   })
@@ -463,8 +488,24 @@ observeEvent({c(input$trialType,
                                                              "' and spp in ('", paste(substr(input$sppPick2,1,2),collapse = "','"),
                                                              "')"))
                       }
+                      
                     }
-                    
+                    dat2$label <- dat2$trial_id
+                    if("GOM" %in% input$trialType){
+                      dat <- dbGetQuery(gomDb, paste0("select latitude,longitude,trial_info.trial_id label,species spp, planting_info.trial_id trial_id 
+                                                        from planting_info
+                                                        JOIN trial_info
+                                                        ON (planting_info.trial_id = trial_info._id)
+                                                        where species in ('",paste(substr(input$sppPick2,1,2),collapse = "','"),"')")) %>% unique()
+                      
+                      if(nrow(dat) > 0){
+                        dat <- st_as_sf(dat, coords = c("longitude","latitude"), crs = 4326)
+                        dat$qualitative_vigour = NA
+                        dat$trial_type = "GOM"
+                      }
+                      if(nrow(dat2) == 0) dat2 <- dat
+                      else dat2 <- rbind(dat,dat2)
+                    }
                     if(nrow(dat2) == 0){
                       dat2 <- NULL
                       leafletProxy("offsiteMap") %>%
@@ -473,28 +514,22 @@ observeEvent({c(input$trialType,
                       #browser()
                       plotLocs <- unique(dat2["trial_id"])
                       dat <- as.data.table(st_drop_geometry(dat2))
-                      # if(input$sppPick2 == "All"){
-                      #   dat <- dat[,.(Col = if(all(assessment == "UN")) "#6B6B6B" else "#AD00BD"),
-                      #              by = .(plotid)]
-                      # }else{
                       dat[,qualitative_vigour := as.character(qualitative_vigour)]
                       dat[is.na(qualitative_vigour), qualitative_vigour := "UN"]
                       dat[assID, ID := i.ID, on = c(qualitative_vigour = "assessment")]
-                      dat <- dat[,.(ID = max(ID)), by = .(trial_id,spp,trial_type)]
+                      dat <- dat[,.(ID = max(ID)), by = .(trial_id,spp,trial_type,label)]
                       dat[assCols, Col := i.Col, on = "ID"]
-                      
-                      dat[,label := paste0("Name: ",trial_id)]
-                      #dat <- dat[,.(trial_id,label,Col,trial_type)]
+                      dat[,label := paste0("Name: ",label)]
                       dat[,Col := as.character(Col)]
-                    
+                      dat[symbolGuide, Symbol := i.symbol, on = c("trial_type")]
                       #updateSelectInput(session,"trialSelect",choices = unique(dat$trial_id))
                       plotLocs <- st_as_sf(merge(plotLocs, dat, by = "trial_id"))
                       temp <- as.data.table(st_coordinates(plotLocs))
                       setnames(temp, c("long","lat"))
                       plotLocs <- cbind(plotLocs, temp)
                       vals <- unique(plotLocs$trial_type)
-                      print(vals)
                       symbols <- symbolGuide[trial_type %in% vals,symbol]
+                      #print(vals)
                       # observeEvent(input$offsiteMap_zoom,{
                       #   print(input$offsiteMap_zoom)
                         leafletProxy("offsiteMap") %>%
