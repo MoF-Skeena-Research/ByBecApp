@@ -43,6 +43,7 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                                               checkboxInput("updatedfeas","Show Original Feasibility",value = F, width = "250px"),
                                               checkboxInput("showadd","Show Additions/Deletions",value = F, width = "250px"),
                                               checkboxInput("showFreq","Show Frequency",value = T),
+                                              checkboxInput("showOHR","Show OHR", value = T),
                                               h4("Edatopic Feasibility:"),
                                               girafeOutput("edaplot",height = "350px"),
                                               

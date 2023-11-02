@@ -190,7 +190,7 @@ observeEvent({c(input$showtrees,
 
 ##Prepare BGC colour table for non-edatopic
 prepDatSimple <- reactive({
-  QRY <- paste0("select bgc,feasorig.ss_nospace,sppsplit,spp,",globalFeas$dat,
+  QRY <- paste0("select bgc,feasorig.ss_nospace,sppsplit,spp,outrange,",globalFeas$dat,
                 " FROM feasorig 
                 JOIN special_ss
                 USING (ss_nospace)
@@ -201,11 +201,14 @@ prepDatSimple <- reactive({
   if(nrow(d1) == 0){
     shinyalert(title = "Oopsie doopsie!",text = "There are no data for that species",
                type = "error",showConfirmButton = T)
-    QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
+    QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,outrange,",globalFeas$dat,
                   " from feasorig where spp = 'Sx' and ",globalFeas$dat," in (1,2,3,4,5)")
     d1 <- dbGetQuery(sppDb, QRY)
   }
   feas <- as.data.table(d1)
+  if(!input$showOHR){
+    feas <- feas[outrange != TRUE,]
+  }
   setnames(feas, old = globalFeas$dat, new = "feasible")
   feasMax <- feas[,.(SuitMax = min(feasible)), by = .(bgc,sppsplit)]
   if(input$showFreq){
@@ -280,7 +283,7 @@ prepDatSimple <- reactive({
 
 ##prep frequency colours
 prepFreq <- reactive({
-  QRY <- paste0("select bgc,feasorig.ss_nospace,sppsplit,spp,",globalFeas$dat,
+  QRY <- paste0("select bgc,feasorig.ss_nospace,sppsplit,spp,outrange,",globalFeas$dat,
                 " FROM feasorig 
                 JOIN special_ss
                 USING (ss_nospace)
@@ -288,6 +291,9 @@ prepFreq <- reactive({
                 AND spp = '",substr(input$sppPick,1,2),
                 "' AND ",globalFeas$dat," in (1,2,3,4,5)")
   feas <- as.data.table(dbGetQuery(sppDb, QRY))
+  if(!input$showOHR){
+    feas <- feas[outrange != TRUE,]
+  }
   setnames(feas, old = globalFeas$dat, new = "feasible")
   edaTemp <- eda[ss_nospace %in% feas$ss_nospace,.(ss_nospace,smr)]
   edaTemp <- edaTemp[,.(smr = mean(smr)), by = .(ss_nospace)]
@@ -313,7 +319,7 @@ prepFreq <- reactive({
 
 ##Prepare BGC colours for edatopic option
 prepEdaDat <- reactive({
-  QRY <- paste0("select bgc,feasorig.ss_nospace,sppsplit,spp,",globalFeas$dat,
+  QRY <- paste0("select bgc,feasorig.ss_nospace,sppsplit,spp,outrange,",globalFeas$dat,
                 " FROM feasorig 
                 JOIN special_ss
                 USING (ss_nospace)
@@ -321,7 +327,11 @@ prepEdaDat <- reactive({
                 AND spp = '",substr(input$sppPick,1,2),
                 "' AND ",globalFeas$dat," in (1,2,3)")
   feas <- as.data.table(dbGetQuery(sppDb, QRY))
-  setnames(feas, old = globalFeas$dat, new = "feasible")        
+  if(!input$showOHR){
+    feas <- feas[outrange != TRUE,]
+  }
+  setnames(feas, old = globalFeas$dat, new = "feasible") 
+  #browser()
   globalLeg$Legend <- edaLeg
   id <- as.numeric(input$edaplot_selected)
   idSub <- idDat[ID == id,.(ID,edatopic)]
@@ -333,6 +343,7 @@ prepEdaDat <- reactive({
   feasSub[,Lab := paste0(ss_nospace,": ", feasible)]
   feasSum <- feasSub[,.(FeasVal = round(mean(feasible)/0.5)*0.5, Lab = paste(Lab, collapse = "<br>")), by = bgc]
   feasSum[edaFreqCols,Col := i.Col, on = "FeasVal"]
+  #browser()
   feasSum[,.(bgc,Col,Lab)]
 })
 
@@ -342,7 +353,8 @@ observeEvent({c(
   input$edaplot_selected,
   input$updatedfeas,
   input$showFreq,
-  input$showadd)
+  input$showadd,
+  input$showOHR)
 },{
   if(input$sppPick == "None"){
     session$sendCustomMessage("clearLayer","xxx")
@@ -388,19 +400,23 @@ prepTable <- reactive({
   print(unit)
   idx_row <- NULL
   idx_col <- NULL
-  QRY <- paste0("select bgc,feasorig.ss_nospace,special_code, sppsplit,spp,",globalFeas$dat,
+  QRY <- paste0("select bgc,feasorig.ss_nospace,special_code, sppsplit, spp, outrange, ",globalFeas$dat,
                 " from feasorig JOIN special_ss
                 USING (ss_nospace) 
                 where bgc = '",unit,"' and ",globalFeas$dat," in (1,2,3,4)")
   feas <- as.data.table(dbGetQuery(sppDb, QRY))
+  ohrdat <- feas[spp == substr(input$sppPick,1,2),.(ss_nospace,outrange)]
+  feas[,outrange := NULL]
+  #browser()
   if(nrow(feas) == 0){
     shinyalert("Oopsies!","There are no species in that subzone :(")
     return(list(dat = feas, rIdx = NULL, cIdx = NULL, sppCol = NULL))
   }
   setnames(feas, old = globalFeas$dat, new = "feasible")   
+  feas[ohrdat, OHR := i.outrange, on = "ss_nospace"]
   if(is.null(input$edaplot_selected)){
     feasSub <- feas[sppsplit != "X",]
-    tabOut <- data.table::dcast(feasSub, ss_nospace + special_code ~ sppsplit,fun.aggregate = mean, value.var = "feasible")
+    tabOut <- data.table::dcast(feasSub, ss_nospace + special_code + OHR ~ sppsplit,fun.aggregate = mean, value.var = "feasible")
     tabOut[,lapply(.SD,as.integer),.SDcols = -"ss_nospace"]
   }else{
     id <- as.numeric(input$edaplot_selected)
@@ -408,7 +424,7 @@ prepTable <- reactive({
     edaSub <- eda[idSub, on = "edatopic"]
     edaSub <- edaSub[bgc == unit,]
     dat <- feas[ss_nospace %in% edaSub$ss_nospace & feasible %in% c(1,2,3,4),]
-    tabOut <- data.table::dcast(dat, ss_nospace + special_code ~ sppsplit, value.var = "feasible", fun.aggregate = mean)
+    tabOut <- data.table::dcast(dat, ss_nospace + special_code + OHR ~ sppsplit, value.var = "feasible", fun.aggregate = mean)
     tabOut[,lapply(.SD,as.integer),.SDcols = -c("ss_nospace","special_code")]
     if(!input$updatedfeas){
       QRY <- paste0("select ss_nospace,sppsplit,feasible from feasorig where bgc = '",
@@ -454,32 +470,34 @@ observeEvent({c(input$bgc_click,
                       temp <- prepTable()
                       dat <- temp$dat
                       #browser()
-                      rhandsontable(data = dat,col_highlight = temp$cIdx,
+                      rhandsontable(data = dat,readOnly = FALSE, col_highlight = temp$cIdx,
                                     row_highlight = temp$rIdx, spp_highlight = temp$sppCol) %>%
-                        hot_cols(format = "0", renderer = "
-                function(instance, td, row, col, prop, value, cellProperties) {
-                Handsontable.renderers.NumericRenderer.apply(this, arguments);
-                if (instance.params) {
-                    hcols = instance.params.col_highlight
-                    hcols = hcols instanceof Array ? hcols : [hcols]
-                    hrows = instance.params.row_highlight
-                    hrows = hrows instanceof Array ? hrows : [hrows]
-                    hspp = instance.params.spp_highlight
-                    hspp = hspp instanceof Array ? hspp : [hspp]
-                }
-                
-                var i;
-                for(i = 0; i < 100; i++){
-                    if (instance.params && (col === hcols[i] && row === hrows[i])) {
-                      td.style.background = 'yellow';
-                    }
-                    if(instance.params && col === hspp[i]){
-                        td.style.background = 'lightgreen';
-                    }
-                }
-                    
-            }
-                             ")
+                        hot_col(3, type = "checkbox", readOnly = FALSE) 
+            #           %>%
+            #             hot_cols(format = "0", renderer = "
+            #     function(instance, td, row, col, prop, value, cellProperties) {
+            #     Handsontable.renderers.NumericRenderer.apply(this, arguments);
+            #     if (instance.params) {
+            #         hcols = instance.params.col_highlight
+            #         hcols = hcols instanceof Array ? hcols : [hcols]
+            #         hrows = instance.params.row_highlight
+            #         hrows = hrows instanceof Array ? hrows : [hrows]
+            #         hspp = instance.params.spp_highlight
+            #         hspp = hspp instanceof Array ? hspp : [hspp]
+            #     }
+            #     
+            #     var i;
+            #     for(i = 0; i < 100; i++){
+            #         if (instance.params && (col === hcols[i] && row === hrows[i])) {
+            #           td.style.background = 'yellow';
+            #         }
+            #         if(instance.params && col === hspp[i]){
+            #             td.style.background = 'lightgreen';
+            #         }
+            #     }
+            #         
+            # }
+            #                  ")
                     })
                   }
                 })
@@ -491,6 +509,7 @@ observeEvent(input$submitdat,{
 
 ##compile and send updates to database
 sendToDb <- function(nme){
+  #browser()
   dat <- as.data.table(hot_to_r(input$hot))
   ss_sp <- unique(dat[!is.na(special_code),.(ss_nospace,special_code)])
   if(nrow(ss_sp) > 0){
@@ -504,13 +523,18 @@ sendToDb <- function(nme){
                   ")
     dbExecute(sppDb,qry)
   }
+  
   dat[,special_code := NULL]
   unit <- globalSelBEC()
   QRY <- paste0("select bgc,ss_nospace,sppsplit,spp,",globalFeas$dat,
                 " from feasorig where bgc = '",unit,"' and ",globalFeas$dat," in (1,2,3,4)")
   datOrig <- as.data.table(dbGetQuery(sppDb, QRY))
-  setnames(datOrig,old = globalFeas$dat, new = "feasible")
-  dat <- melt(dat, id.vars = "ss_nospace", value.name = "newfeas", variable.name = "sppsplit")
+  setnames(datOrig,old = c(globalFeas$dat), new = c("feasible"))
+  
+  datohr <- dat[!is.na(OHR),.(ss_nospace,OHR)]
+  setnames(datohr,old = "OHR",new = "outrange")
+  dat[,OHR := NULL]
+  dat <- melt(dat, id.vars = c("ss_nospace"), value.name = "newfeas", variable.name = "sppsplit")
   dat2 <- datOrig[dat, on = c("ss_nospace","sppsplit")]
   dat2[is.na(feasible),feasible := -1]
   dat2 <- dat2[newfeas != feasible,]
@@ -520,6 +544,7 @@ sendToDb <- function(nme){
   dbWriteTable(sppDb,"feas_audit", datAudit, append = T, row.names = F)
   datNew <- dat2[is.na(bgc),]
   datOld <- dat2[!is.na(bgc),]
+  #browser()
   if(nrow(datNew) > 0){
     temp <- data.table(bgc = gsub("/.*","",datNew$ss_nospace),ss_nospace = datNew$ss_nospace,
                        sppsplit = datNew$sppsplit,feasible = NA, 
@@ -530,7 +555,8 @@ sendToDb <- function(nme){
     dbWriteTable(sppDb, "temp_update", datOld, overwrite = T)
     dbExecute(sppDb,"UPDATE feasorig 
                   SET newfeas = temp_update.newfeas,
-                  mod = temp_update.mod
+                  mod = temp_update.mod,
+                  outrange = temp_update.outrange
                   FROM temp_update
                   WHERE feasorig.ss_nospace = temp_update.ss_nospace
                   AND feasorig.sppsplit = temp_update.sppsplit")
@@ -538,6 +564,14 @@ sendToDb <- function(nme){
                   SET newfeas = 5
                   WHERE newfeas IS NULL
                   AND feasible IS NOT NULL")
+  }
+  if(nrow(datohr) > 0){
+    dbWriteTable(sppDb, "temp_update", datohr, overwrite = T)
+    dbExecute(sppDb,paste0("UPDATE feasorig 
+                  SET outrange = temp_update.outrange
+                  FROM temp_update
+                  WHERE feasorig.ss_nospace = temp_update.ss_nospace
+                  AND feasorig.spp = '",substr(input$sppPick,1,2),"'"))
   }
   
   shinyalert("Thank you!","Your updates have been recorded", type = "info",
