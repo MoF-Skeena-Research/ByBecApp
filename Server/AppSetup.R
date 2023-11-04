@@ -18,6 +18,7 @@ library(colourvalues)
 library(shinythemes)
 library(gridExtra)
 library(pool)
+library(ccissdev)
 
 ##connect to database
 ###Read in climate summary data
@@ -30,6 +31,15 @@ sppDb <- dbPool(
   dbname = "spp_feas",
   host = Sys.getenv("BCGOV_HOST"),
   port = 5432, 
+  user = Sys.getenv("BCGOV_USR"),
+  password = Sys.getenv("BCGOV_PWD")
+)
+
+con <- dbPool(
+  drv = RPostgres::Postgres(),
+  dbname = Sys.getenv("BCGOV_DB"),
+  host = Sys.getenv("BCGOV_HOST"),
+  port = 5432,
   user = Sys.getenv("BCGOV_USR"),
   password = Sys.getenv("BCGOV_PWD")
 )
@@ -57,6 +67,7 @@ onStop(function() {
   poolClose(climDb)
   poolClose(sppDb)
   poolClose(gomDb)
+  poolClose(con)
 })
 
 subzones_colours_ref <- fread("./inputs/WNA_v12_HexCols.csv")
@@ -268,3 +279,50 @@ freq_rules <- data.table(SMR = c(0L, 1L, 2L, 3L, 4L, 5L, 6L, 7L, 0L, 1L, 2L, 3L,
                                       2L, 3L, 3L, 3L, 3L, 3L, 3L, 3L, 3L),
                          FreqCode = c(1, 2, 2, 2, 3, 2, 2, 1, 1, 1, 1, 2, 3, 2, 1, 1, 1, 1, 1, 1, 
                                       1, 1, 1, 1))
+
+##adapted feasibility function
+ccissMap <- function(SSPred,suit,spp_select){
+  ### generate raw feasibility ratios
+  
+  #suit <- suit[Spp == spp_select,.(BGC,SS_NoSpace,Spp,Feasible)]
+  suit <- unique(suit)
+  suit <- na.omit(suit)
+  SSPred <- SSPred[,.(SiteRef,FuturePeriod,BGC,SS_NoSpace,SS.pred,SSprob)]
+  Site_BGC <- unique(SSPred[,.(SiteRef,BGC)])
+  SSPred <- na.omit(SSPred)
+  setkey(SSPred,SS.pred)
+  setkey(suit,SS_NoSpace)
+  suitMerge <- suit[SSPred, allow.cartesian = T]
+  suitMerge <- na.omit(suitMerge)
+  setnames(suitMerge, old = c("SS_NoSpace", "i.SS_NoSpace"), new = c("SS.pred", "SS_NoSpace"))
+  suitVotes <- data.table::dcast(suitMerge, SiteRef + Spp + FuturePeriod + SS_NoSpace ~ Feasible, 
+                                 value.var = "SSprob", fun.aggregate = sum)
+  # Fill with 0 if columns does not exist, encountered the error at SiteRef 3104856 
+  colNms <- c("1","2","3","X")
+  set(suitVotes, j = as.character(1:5)[!as.character(1:5) %in% names(suitVotes)], value = 0)
+  
+  suitVotes[,VoteSum := `1`+`2`+`3`+`4`+`5`]
+  suitVotes[,X := 1 - VoteSum]
+  suitVotes[,VoteSum := NULL]
+  suitVotes[,X := X + `5` + `4`]
+  suitVotes[,`:=`(`5` = NULL, `4` = NULL)]
+  setkey(suitVotes, SS_NoSpace, Spp)
+  setkey(suit, SS_NoSpace, Spp)
+  suitVotes[suit, Curr := i.Feasible]
+  suitVotes[is.na(Curr), Curr := 5]
+  setorder(suitVotes,SiteRef,SS_NoSpace,Spp,FuturePeriod)
+  suitVotes[Curr > 3.5, Curr := 4]
+  
+  # suitVotes[,Improve := ModelDir(as.matrix(.SD), Curr = Curr, dir = "Improve"),.SDcols = colNms]
+  # suitVotes[,Decline := ModelDir(as.matrix(.SD), Curr = Curr, dir = "Decline"),.SDcols = colNms]
+  # datRot <- suitVotes[,lapply(.SD, mean),.SDcols = c("Improve","Decline"), by = list(SiteRef,SS_NoSpace,Spp,Curr)]
+  # datRot[,`:=`(Improve = round(Improve*100),Decline = round(Decline*100))]
+  # datRot[,Curr := NULL]
+  
+  suitVotes <- suitVotes[,lapply(.SD, sum),.SDcols = colNms, 
+                         by = .(SiteRef,FuturePeriod, SS_NoSpace,Spp,Curr)]
+  suitVotes[,NewSuit := `1`+(`2`*2)+(`3`*3)+(X*5)]
+  #suitVotes <- merge(suitVotes, datRot, by = c('SiteRef','SS_NoSpace','Spp'),all = T)
+  suitRes <- suitVotes[,.(Curr = mean(Curr),NewSuit = mean(NewSuit)), by = .(SiteRef)]
+  return(suitRes)
+}

@@ -360,6 +360,25 @@ ui <- fluidPage(theme = shinytheme("lumen"),
                              )
                              
                     ),
+                    tabPanel(title = "CCISS Maps",
+                             fluidRow(
+                               column(2,
+                                selectInput("cciss_period", "Choose Period", choices = c("2021","2041","2061","2081"), selected = "2041"),
+                                #girafeOutput("cciss_edaplot",height = "350px"),
+                                selectInput("cciss_eda","Select Site", choices = c("B2","C4","D6"),selected = "C4"),
+                                selectInput("cciss_sppPick",
+                                            label = "Select a Species",
+                                            choices = c("None",sppList),
+                                            selected = "Cw - western redcedar"),
+                                selectInput("cciss_stat", "Choose Statistic", choices = c("Current","NewFeas","FeasChange")),
+                                actionButton("render_cciss","Render Map")
+                               ),
+                               column(10,
+                                      leafletOutput("cciss_map", height = "80vh")
+                               )
+                             )
+                             
+                    ),
                     tabPanel("About",
                              panel(style = "overflow-y:scroll; max-height: 900px; position:relative; align: centre",
                                    h1("About the By BGC Map Apps"),
@@ -401,6 +420,7 @@ server <- function(input, output, session) {
     source("Server/Server_Offsite.R",local = T)
     source("Server/Server_ForHealth.R",local = T)
     source("Server/Server_ClimSum.R",local = T)
+    source("Server/Server_CCISSMaps.R", local = T)
     source("Server/Server_FindBGC.R",local = T)
 }
 

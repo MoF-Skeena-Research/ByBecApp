@@ -472,32 +472,31 @@ observeEvent({c(input$bgc_click,
                       #browser()
                       rhandsontable(data = dat,readOnly = FALSE, col_highlight = temp$cIdx,
                                     row_highlight = temp$rIdx, spp_highlight = temp$sppCol) %>%
-                        hot_col(3, type = "checkbox", readOnly = FALSE) 
-            #           %>%
-            #             hot_cols(format = "0", renderer = "
-            #     function(instance, td, row, col, prop, value, cellProperties) {
-            #     Handsontable.renderers.NumericRenderer.apply(this, arguments);
-            #     if (instance.params) {
-            #         hcols = instance.params.col_highlight
-            #         hcols = hcols instanceof Array ? hcols : [hcols]
-            #         hrows = instance.params.row_highlight
-            #         hrows = hrows instanceof Array ? hrows : [hrows]
-            #         hspp = instance.params.spp_highlight
-            #         hspp = hspp instanceof Array ? hspp : [hspp]
-            #     }
-            #     
-            #     var i;
-            #     for(i = 0; i < 100; i++){
-            #         if (instance.params && (col === hcols[i] && row === hrows[i])) {
-            #           td.style.background = 'yellow';
-            #         }
-            #         if(instance.params && col === hspp[i]){
-            #             td.style.background = 'lightgreen';
-            #         }
-            #     }
-            #         
-            # }
-            #                  ")
+                        hot_col(3, type = "checkbox", readOnly = FALSE) %>%
+                        hot_col(4:ncol(dat), format = "0", renderer = "
+                function(instance, td, row, col, prop, value, cellProperties) {
+                Handsontable.renderers.NumericRenderer.apply(this, arguments);
+                if (instance.params) {
+                    hcols = instance.params.col_highlight
+                    hcols = hcols instanceof Array ? hcols : [hcols]
+                    hrows = instance.params.row_highlight
+                    hrows = hrows instanceof Array ? hrows : [hrows]
+                    hspp = instance.params.spp_highlight
+                    hspp = hspp instanceof Array ? hspp : [hspp]
+                }
+
+                var i;
+                for(i = 0; i < 100; i++){
+                    if (instance.params && (col === hcols[i] && row === hrows[i])) {
+                      td.style.background = 'yellow';
+                    }
+                    if(instance.params && col === hspp[i]){
+                        td.style.background = 'lightgreen';
+                    }
+                }
+
+            }
+                             ")
                     })
                   }
                 })
@@ -555,8 +554,7 @@ sendToDb <- function(nme){
     dbWriteTable(sppDb, "temp_update", datOld, overwrite = T)
     dbExecute(sppDb,"UPDATE feasorig 
                   SET newfeas = temp_update.newfeas,
-                  mod = temp_update.mod,
-                  outrange = temp_update.outrange
+                  mod = temp_update.mod
                   FROM temp_update
                   WHERE feasorig.ss_nospace = temp_update.ss_nospace
                   AND feasorig.sppsplit = temp_update.sppsplit")
