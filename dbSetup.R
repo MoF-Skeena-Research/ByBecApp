@@ -72,6 +72,10 @@ dbExecute(con,"create index on offsite_site(trial_id)")
 
 ##update forest health
 #fh <- dbGetQuery(con,"select * from forhealth_backup")
+dbFeas <- setDT(dbGetQuery(con,"select * from feasorig"))
+fwrite(dbFeas,"feasorig_save_Sept27_23.csv") ##just in case something goes wrong
+
+
 fh <- dbGetQuery(con,"select * from forhealth")
 feas <- dbGetQuery(con,"select * from feasorig")
 fhUnits <- unique(fh$bgc)
@@ -104,7 +108,11 @@ dbWriteTable(con,"forhealth",newfh,row.names = F)
 #########################
 
 
-feas <- fread("./inputs/Feasibility_v12_12.csv")
+feas <- fread("../CCISS_ShinyApp/data-raw/data_tables/Feasibility_v12_14_w_OHR.csv")
+feas[,outrange := fifelse(OHR == "OHR", TRUE, FALSE)]
+feas[mod == "", mod := NA]
+feas[,OHR := NULL]
+
 feas <- feas[,.(BGC,SS_NoSpace,SppVar,Feasible)]
 setnames(feas, old = "SppVar",new = "SppSplit")
 feas[,Spp := SppSplit]
@@ -120,7 +128,7 @@ feas[,mod := NA_character_]
 feas <- feas[sppsplit != "X",]
 feas[,fid := seq_along(feas$bgc)]
 
-eda <- fread("./inputs//Edatopic_v12_11.csv")
+eda <- fread("../CCISS_ShinyApp/data-raw/data_tables/Edatopic_v12_12.csv")
 #eda <- eda[is.na(Special) | Special == "",.(BGC,SS_NoSpace,Edatopic)]
 
 eda[,SMR := as.numeric(gsub("[[:alpha:]]","", Edatopic))]
@@ -144,11 +152,12 @@ treesf <- st_as_sf(treeLocs,coords = c("long", "lat"),
                    crs = 4326)
 st_write(treesf,con,"plotdata")
 
-data <- fread("~/CommonTables/WNA_SSeries_v12_6.csv")
+data <- fread("../CCISS_ShinyApp/data-raw/data_tables/WNA_SSeries_v12_12.csv")
 data <- data[,.(SS_NoSpace,SpecialCode,Special)]
 data[SpecialCode == "",SpecialCode := NA]
 data[Special == "",Special := NA]
 setnames(data,c("ss_nospace","special_code","special_name"))
+dbExecute(con,"drop table special_ss")
 dbWriteTable(con,"special_ss",data, row.names = F)
 dbExecute(con,"create index on special_ss(special_code)")
 
