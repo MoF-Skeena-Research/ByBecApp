@@ -35,40 +35,67 @@ output$cciss_edaplot <- renderGirafe({
 })
 
 get_sspreds <- reactive({
-    bgc <- setDT(dbGetQuery(con,paste0("select * from mapdata_2km where futureperiod = '",input$cciss_period,"'"))) ##takes about 15 seconds
-    setnames(bgc, c("SiteRef","FuturePeriod","BGC","BGC.pred","BGC.prop"))
-    
-    edaTemp <- data.table::copy(E1)
-    edaTemp <- edaTemp[is.na(SpecialCode),]
-    edaTemp[,HasPos := if(any(Edatopic == input$cciss_eda)) T else F, by = .(SS_NoSpace)]
-    edaZonal <- edaTemp[(HasPos),]
-    edaZonal[,HasPos := NULL]
-    ##edatopic overlap
-    SSPreds <- edatopicOverlap(bgc,edaZonal,E1_Phase,onlyRegular = TRUE)
-    return(SSPreds)
+  qry <- paste0("
+WITH sspred AS (
+SELECT * FROM map2km_sspred 
+INNER JOIN edatopic USING(ss_nospace)
+WHERE edatopic = '",input$cciss_eda,"'
+AND period = '",input$cciss_period,"'
+),
+feas AS (
+	SELECT ss_nospace, newfeas FROM feasibility WHERE spp = '",substr(input$cciss_sppPick,1,2),"'
+) 
+SELECT siteref, sspred.ss_nospace, feas.newfeas, SUM(ss_prob) 
+FROM sspred INNER JOIN feas ON (sspred.ss_pred = feas.ss_nospace)
+GROUP BY (siteref, sspred.ss_nospace, newfeas);")
+
+dat <- as.data.table(dbGetQuery(con, qry))
+feas <- as.data.table(dbGetQuery(con,paste0("SELECT ss_nospace, newfeas from feasibility where spp = '",substr(input$cciss_sppPick,1,2),"'")))
+setnames(feas,c("SS_NoSpace","Feasible"))
+res <- cciss_feas(dat,feas)
+return(res)
 }) %>%
-  bindCache(input$cciss_period,input$cciss_eda)
+  bindCache(input$cciss_sppPick,input$cciss_eda, input$cciss_period)
 
 observeEvent(input$render_cciss,{
   # base raster
   #browser()
-  X <- rast("BC_Raster.tif")
-  SSPreds <- get_sspreds()
+  X <- rast("./inputs/BC_Raster.tif")
+  newFeas <- get_sspreds()
   print("map2")
-  suit <- as.data.table(dbGetQuery(sppDb, paste0("select bgc, ss_nospace, spp, newfeas from feasorig where spp = '",substr(input$cciss_sppPick,1,2),"'")))
-  setnames(suit, c("BGC","SS_NoSpace","Spp","Feasible"))
-  
-  newFeas <- ccissMap(SSPreds,suit,substr(input$cciss_sppPick,1,2))
   
   newFeas[NewSuit > 4, NewSuit := 4]
   newFeas[,FeasChange := Curr - NewSuit]
-  newFeas <- unique(newFeas, by = "SiteRef")
-  newFeas[,SiteRef := as.integer(SiteRef)]
+  newFeas[,siteref := as.integer(siteref)]
   values(X) <- NA
-  X[newFeas$SiteRef] <- newFeas$FeasChange
+  if(input$cciss_stat == "Current"){
+    X[newFeas$siteref] <- newFeas$Curr
+    ColScheme <- c("darkgreen", "dodgerblue1", "gold2", "white")
+    X2 <- project(X, "epsg:3857")
+    X2 <- round(X2)
+    ctab <- data.frame(value = c(1,2,3,4), col = ColScheme)
+    coltab(X2) <- ctab
+  }else if(input$cciss_stat == "NewFeas"){
+    X[newFeas$siteref] <- newFeas$NewSuit
+    X2 <- project(X, "epsg:3857")
+    ColScheme <- c("darkgreen", "dodgerblue1", "gold2", "white")
+    X2 <- project(X, "epsg:3857")
+    X2 <- round(X2)
+    ctab <- data.frame(value = c(1,2,3,4), col = ColScheme)
+    coltab(X2) <- ctab
+  }else{
+    X[newFeas$siteref] <- newFeas$FeasChange
+    X2 <- project(X, "epsg:3857")
+    X2 <- round(X2/0.5)*5
+    ColScheme <- c("black", brewer.pal(11,"RdBu")[c(1,2,3,4,5)], "grey90", brewer.pal(11,"RdBu")[c(6,7,8,9,10,11)])
+    ctab <- data.frame(value = seq(-3,3,0.5)*10, col = ColScheme)
+    coltab(X2) <- ctab
+  }
   
+
   leafletProxy("cciss_map") %>%
-    leaflet::addRasterImage(X)
+    clearImages() %>%
+    leaflet::addRasterImage(X2, project = FALSE)
 })
 
 output$cciss_map <- renderLeaflet({
