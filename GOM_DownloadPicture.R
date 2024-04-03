@@ -40,3 +40,36 @@ for(curr_id in all_ids){
 meta_all <- rbindlist(meta_ls)
 fwrite(meta_all, paste0(out_folder,"/meta_info.csv"))
 
+#### add meta data to images
+###https://www.thomasvanhoey.com/post/changing-photo-metadata-with-r/
+# general packages
+library(tidyverse) # our swiss army knife
+library(fs) # reading in files in a tidyish way
+library(lubridate) # working with dates 
+
+# specialized packages
+library(exifr) # for reading photo metadata
+
+files <- dir_ls("./gom_pics",
+recurse = TRUE,
+regexp = ".png$")
+
+
+# defining a function
+# change_file_create_date <- function(afb){
+#   # get correct exif date
+#   read_exif(path = afb,
+#             tags = c("DateTimeOriginal")) %>%
+#     pull(DateTimeOriginal) %>%
+#     parse_date_time("Ymd HMS", 
+#                     tz = "Asia/Taipei" #timezone
+#     ) -> correct_time
+#   
+#   # changing the creation date
+#   Sys.setFileTime(afb, correct_time)
+#   
+# }
+# 
+# 
+# # run the function over all the different files
+# purrr::walk(files, change_file_create_date)
